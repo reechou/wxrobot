@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/config"
@@ -14,6 +15,8 @@ import (
 )
 
 type EventManager struct {
+	sync.Mutex
+	
 	wxm *WxManager
 	cfg *config.Config
 
@@ -41,6 +44,21 @@ func NewEventManager(wxm *WxManager, cfg *config.Config) *EventManager {
 
 func (self *EventManager) Stop() {
 	close(self.stop)
+}
+
+func (self *EventManager) Reset() {
+	close(self.stop)
+	self.filters = make(map[string][]*EventFilter)
+	self.crons = make(map[string][]*EventCron)
+	self.stop = make(chan struct{})
+}
+
+func (self *EventManager) ReloadFile() {
+	self.Lock()
+	defer self.Unlock()
+	
+	self.Reset()
+	self.loadFile()
 }
 
 func (self *EventManager) loadFile() {
@@ -125,6 +143,7 @@ func (self *EventManager) Run() {
 	for {
 		select {
 		case msg := <-self.msgChan:
+			self.Lock()
 			fs, ok := self.filters[msg.msg.BaseInfo.WechatNick]
 			if ok {
 				for _, v := range fs {
@@ -138,6 +157,7 @@ func (self *EventManager) Run() {
 				}
 			}
 			msg.cancel()
+			self.Unlock()
 		case <-self.stop:
 			return
 		}
