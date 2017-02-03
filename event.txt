@@ -1,4 +1,4 @@
-filter 铅笔11 anytime receivemsg include()个人信息,订单查询,下线查询,http $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
-filter 铅笔11 anytime receivemsg include()签到 $empty people sendmsg^people^$from^text>>>正在操作中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
-filter 铅笔11 anytime receivemsg include()提现 $empty people callback^http://127.0.0.1:6869/robot_call
-filter 铅笔11 anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>谢谢加我为好友,我是返利小机器人|||callback^http://127.0.0.1:6869/robot_call
+filter Mr.REE anytime receivemsg include()个人信息,订单查询,下线查询,http $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
+filter Mr.REE anytime receivemsg include()签到 $empty people sendmsg^people^$from^text>>>正在操作中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
+filter Mr.REE anytime receivemsg include()提现,帮助 $empty people callback^http://127.0.0.1:6869/robot_call
+filter Mr.REE anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>谢谢加我为好友,我是返利小机器人|||callback^http://127.0.0.1:6869/robot_call
