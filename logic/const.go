@@ -27,9 +27,10 @@ const (
 )
 
 const (
-	DO_EVENT_SENDMSG     = "sendmsg"
-	DO_EVENT_VERIFY_USER = "verifyuser"
-	DO_EVENT_CALLBACK    = "callback"
+	DO_EVENT_SENDMSG      = "sendmsg"
+	DO_EVENT_VERIFY_USER  = "verifyuser"
+	DO_EVENT_CALLBACK     = "callback"
+	DO_EVENT_CALLBACK_RPC = "callbackrpc"
 )
 
 const (

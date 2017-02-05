@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/wxweb"
+	jsonrpc "github.com/gorilla/rpc/json"
 )
 
 type DoEvent struct {
@@ -45,6 +46,60 @@ func (self *DoEvent) Do(rMsg *ReceiveMsgInfo) {
 		self.wxm.VerifyUser(rMsg.msg)
 	case DO_EVENT_CALLBACK:
 		self.call(rMsg)
+	case DO_EVENT_CALLBACK_RPC:
+		self.callrpc(rMsg)
+	}
+}
+
+func (self *DoEvent) callrpc(rMsg *ReceiveMsgInfo) {
+	if self.client == nil {
+		self.client = &http.Client{}
+	}
+	url := self.DoMsg.(string)
+	if url == "" {
+		logrus.Errorf("do event[callrpc] url == nil, please change config.")
+		return
+	}
+	
+	message, err := jsonrpc.EncodeClientRequest("robot.callback", rMsg.msg)
+	if err != nil {
+		logrus.Errorf("[callrpc] json encode client request error: %v", err)
+		return
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(message))
+	if err != nil {
+		logrus.Errorf("[callrpc] http new request error: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := self.client.Do(req)
+	if err != nil {
+		logrus.Errorf("[callrpc] http do request error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	var callbackMsg wxweb.CallbackMsgInfo
+	err = jsonrpc.DecodeClientResponse(resp.Body, &callbackMsg)
+	if err != nil {
+		logrus.Errorf("[callrpc] json decode client response error: %v", err)
+		return
+	}
+	if callbackMsg.RetResponse.Code != 0 {
+		logrus.Errorf("do event[callback] ret error: %d %s", callbackMsg.RetResponse.Code, callbackMsg.RetResponse.Msg)
+		return
+	}
+	for _, v := range callbackMsg.CallbackMsgs {
+		if v.Msg != "" {
+			msg := &SendMsgInfo{
+				WeChat:   v.WechatNick,
+				ChatType: v.ChatType,
+				Name:     v.NickName,
+				UserName: v.UserName,
+				MsgType:  v.MsgType,
+				Msg:      v.Msg,
+			}
+			self.wxm.SendMsg(msg, msg.Msg)
+		}
 	}
 }
 
