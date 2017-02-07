@@ -7,6 +7,7 @@ import (
 )
 
 type EventFilter struct {
+	eventId  int
 	wxm      *WxManager
 	WeChat   string
 	Time     string
@@ -25,9 +26,10 @@ func (self *EventFilter) GetMsgChan() chan *ReceiveMsgInfo {
 	return self.msgChan
 }
 
-func (self *EventFilter) Init(stop chan struct{}) {
+func (self *EventFilter) Init(eventId int, stop chan struct{}) {
 	self.msgChan = make(chan *ReceiveMsgInfo, EVENT_MSG_CHAN_LEN)
 	self.stop = stop
+	self.eventId = eventId
 
 	doList := strings.Split(self.Do, "|||")
 	for _, v := range doList {
@@ -84,6 +86,7 @@ func (self *EventFilter) Run() {
 					continue
 				}
 			}
+			logrus.Debugf("filter[%d] msg: %v", self.eventId, msg.msg)
 			if self.From != "" {
 				if msg.msg.BaseInfo.FromType == CHAT_TYPE_GROUP {
 					if !ExecCheckFunc(self.From, msg.msg.BaseInfo.FromGroupName) {
@@ -95,6 +98,7 @@ func (self *EventFilter) Run() {
 				v.Do(msg)
 			}
 		case <-self.stop:
+			logrus.Infof("filter do[%s] stopped")
 			return
 		}
 	}

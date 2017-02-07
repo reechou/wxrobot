@@ -17,6 +17,8 @@ import (
 type EventManager struct {
 	sync.Mutex
 	
+	eventId int
+	
 	wxm *WxManager
 	cfg *config.Config
 
@@ -77,6 +79,7 @@ func (self *EventManager) loadFile() {
 	buf := bufio.NewReader(f)
 	for {
 		line, _, err := buf.ReadLine()
+		logrus.Debug("************* ", string(line))
 		//line, err := buf.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
@@ -115,7 +118,8 @@ func (self *EventManager) loadFile() {
 			if f.FromType == EMPTY {
 				f.FromType = ""
 			}
-			f.Init(self.stop)
+			self.eventId++
+			f.Init(self.eventId, self.stop)
 			fv := self.filters[f.WeChat]
 			fv = append(fv, f)
 			self.filters[f.WeChat] = fv
