@@ -164,6 +164,7 @@ func (self *DoEvent) call(rMsg *ReceiveMsgInfo) {
 
 func (self *DoEvent) changeString(sm *SendMsgInfo, rm *ReceiveMsgInfo) string {
 	result := sm.Msg
+	result = strings.Replace(result, "\\n", "\n", -1)
 	if strings.Contains(sm.Msg, FROMGROUP) {
 		result = strings.Replace(result, FROMGROUP, rm.msg.BaseInfo.FromGroupName, -1)
 	}
