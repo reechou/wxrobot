@@ -41,6 +41,7 @@ func (self *WxHttpSrv) registerHandlers() {
 	self.httpSrv.Route("/startwx", self.httpWrap(self.StartWx))
 	self.httpSrv.Route("/startwx2", self.httpWrap(self.StartWxWithArgv))
 	self.httpSrv.Route("/sendmsgs", self.httpWrap(self.ReceiveSendMsgs))
+	self.httpSrv.Route("/reloadevent", self.httpWrap(self.ReloadEvent))
 }
 
 func (self *WxHttpSrv) httpWrap(handler HttpHandler) func(rsp http.ResponseWriter, req *http.Request) {

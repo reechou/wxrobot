@@ -59,6 +59,7 @@ func (self *EventManager) ReloadFile() {
 	
 	self.Reset()
 	self.loadFile()
+	go self.Run()
 }
 
 func (self *EventManager) loadFile() {
@@ -72,6 +73,7 @@ func (self *EventManager) loadFile() {
 		logrus.Errorf("open file[%s] error: %v", self.cfg.WxEventFile, err)
 		return
 	}
+	defer f.Close()
 	buf := bufio.NewReader(f)
 	for {
 		line, err := buf.ReadString('\n')
@@ -159,6 +161,7 @@ func (self *EventManager) Run() {
 			msg.cancel()
 			self.Unlock()
 		case <-self.stop:
+			logrus.Infof("event manager run stopped.")
 			return
 		}
 	}

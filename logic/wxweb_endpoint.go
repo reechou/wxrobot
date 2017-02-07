@@ -45,3 +45,11 @@ func (self *WxHttpSrv) ReceiveSendMsgs(rsp http.ResponseWriter, req *http.Reques
 
 	return response, nil
 }
+
+func (self *WxHttpSrv) ReloadEvent(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
+	response := WxResponse{Code: WX_RESPONSE_OK}
+	
+	self.l.eventMgr.ReloadFile()
+	
+	return response, nil
+}
