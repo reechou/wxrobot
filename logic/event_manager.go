@@ -76,7 +76,8 @@ func (self *EventManager) loadFile() {
 	defer f.Close()
 	buf := bufio.NewReader(f)
 	for {
-		line, err := buf.ReadString('\n')
+		line, _, err := buf.ReadLine()
+		//line, err := buf.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -84,15 +85,15 @@ func (self *EventManager) loadFile() {
 			logrus.Errorf("load event file[%s] error: %v", self.cfg.WxEventFile, err)
 			break
 		}
-		line = strings.Replace(line, "\n", "", -1)
-		argv := strings.Split(line, " ")
+		//line = strings.Replace(line, "\n", "", -1)
+		argv := strings.Split(string(line), " ")
 		if len(argv) == 0 {
 			continue
 		}
 		switch argv[0] {
 		case "filter":
 			if len(argv) != 8 {
-				logrus.Errorf("filter argv error: %s", line)
+				logrus.Errorf("filter argv error: %s len(argv)=%d", string(line), len(argv))
 				continue
 			}
 			f := &EventFilter{
@@ -121,7 +122,7 @@ func (self *EventManager) loadFile() {
 		case "timer":
 		case "cron":
 			if len(argv) != 4 {
-				logrus.Errorf("cron argv error: %s", line)
+				logrus.Errorf("cron argv error: %s", string(line))
 				continue
 			}
 			c := &EventCron{

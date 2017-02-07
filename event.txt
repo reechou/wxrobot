@@ -1,4 +1,4 @@
 filter 铅笔 anytime receivemsg include()个人信息,订单查询,下线查询,http,1,4,3 $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
 filter 铅笔 anytime receivemsg include()签到,2 $empty people sendmsg^people^$from^text>>>正在操作中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
 filter 铅笔 anytime receivemsg include()提现,帮助,5,6 $empty people callback^http://127.0.0.1:6869/robot_call
-filter 铅笔 anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>谢谢加我为好友,我是返利小机器人|||callback^http://127.0.0.1:6869/robot_call
+filter 铅笔 anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>亲，您好！欢迎加入“便宜淘”！\n“便宜淘”与天猫淘宝千万商家合作，商家为了商品的销量冲榜而与我们合作推广商品。\n你只要通过“便宜淘”在淘宝上购物，您不仅可以找到优惠券，好评后还可找“便宜淘”领取返现。\n怎么通过“便宜淘”购买商品领取优惠券和返现呢？\n第1步:手机淘宝上选择你要购买的商品，点击[分享]->[复制链接]到“便宜淘”的对话框\n第2步:“便宜淘”就会帮你查到这个商品的所有可用优惠券和返现\n第3步:长按复制返回的消息，打开手机淘宝领取优惠券购买\n第4步:确认收货并给予商家好评后再获得返现\n\n“便宜淘”不仅能给您找优惠并返现，将“便宜淘”的名片分享给小伙伴并通过成为好友后，“便宜淘”会将您的小伙伴自动记录为您的下线，下线购买商品后的积分20%会录入您的账上。\n详细功能查询请回复：“6”和“帮助”\n点击下方链接可了解如何下单得返现和下线积分规则。\nhttp://t.cn/RJwZCu0|||callback^http://127.0.0.1:6869/robot_call
