@@ -62,6 +62,43 @@ func (self *EventFilter) Init(eventId int, stop chan struct{}) {
 				continue
 			}
 			self.DoEvent = append(self.DoEvent, DoEvent{wxm: self.wxm, Type: DO_EVENT_CALLBACK, DoMsg: doDetail[1]})
+		case DO_EVENT_START_WEB_WX:
+			if len(doDetail) != 2 || len(doDetail) != 3 {
+				logrus.Errorf("filter init error: %v", doDetail)
+				continue
+			}
+			startWxArgv := NewStartWxArgv()
+			startWxArgv.Url = doDetail[1]
+			if len(doDetail) == 3 {
+				argvInfo := strings.Split(doDetail[2], ",")
+				for _, argvV := range argvInfo {
+					argvEqual := strings.Split(argvV, ">>>")
+					if len(argvEqual) != 2 {
+						continue
+					}
+					switch argvEqual[0] {
+					case START_WX_IfInvite:
+						if argvEqual[1] == "true" {
+							startWxArgv.Argv.IfInvite = true
+						}
+					case START_WX_IfInviteEndExit:
+						if argvEqual[1] == "true" {
+							startWxArgv.Argv.IfInviteEndExit = true
+						}
+					case START_WX_InviteMsg:
+						startWxArgv.Argv.InviteMsg = argvEqual[1]
+					case START_WX_IfClearWx:
+						if argvEqual[1] == "true" {
+							startWxArgv.Argv.IfClearWx = true
+						}
+					case START_WX_ClearWxMsg:
+						startWxArgv.Argv.ClearWxMsg = argvEqual[1]
+					case START_WX_ClearWxPrefix:
+						startWxArgv.Argv.ClearWxPrefix = argvEqual[1]
+					}
+				}
+			}
+			self.DoEvent = append(self.DoEvent, DoEvent{wxm: self.wxm, Type: DO_EVENT_START_WEB_WX, DoMsg: startWxArgv})
 		}
 	}
 	go self.Run()

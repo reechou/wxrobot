@@ -16,6 +16,16 @@ const (
 	STATE_GROUP_NUM = "stategroupnum()"
 )
 
+// 参数
+const (
+	START_WX_IfInvite        = "IfInvite"
+	START_WX_IfInviteEndExit = "IfInviteEndExit"
+	START_WX_InviteMsg       = "InviteMsg"
+	START_WX_IfClearWx       = "IfClearWx"
+	START_WX_ClearWxMsg      = "ClearWxMsg"
+	START_WX_ClearWxPrefix   = "ClearWxPrefix"
+)
+
 const (
 	CHAT_TYPE_PEOPLE = "people"
 	CHAT_TYPE_GROUP  = "group"
@@ -31,6 +41,7 @@ const (
 	DO_EVENT_VERIFY_USER  = "verifyuser"
 	DO_EVENT_CALLBACK     = "callback"
 	DO_EVENT_CALLBACK_RPC = "callbackrpc"
+	DO_EVENT_START_WEB_WX = "startwebwx"
 )
 
 const (

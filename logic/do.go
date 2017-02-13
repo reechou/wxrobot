@@ -48,7 +48,54 @@ func (self *DoEvent) Do(rMsg *ReceiveMsgInfo) {
 		self.call(rMsg)
 	case DO_EVENT_CALLBACK_RPC:
 		self.callrpc(rMsg)
+	case DO_EVENT_START_WEB_WX:
+		self.startwebwx(rMsg)
 	}
+}
+
+func (self *DoEvent) startwebwx(rMsg *ReceiveMsgInfo) {
+	argv := self.DoMsg.(*StartWxArgv)
+	if argv == nil {
+		logrus.Errorf("do event[startwebwx] argv == nil, please change config.")
+		return
+	}
+	if self.client == nil {
+		self.client = &http.Client{}
+	}
+	
+	reqBytes, err := json.Marshal(argv.Argv)
+	if err != nil {
+		logrus.Errorf("do event[startwebwx] json encode error: %v", err)
+		return
+	}
+	req, err := http.NewRequest("POST", argv.Url, bytes.NewBuffer(reqBytes))
+	if err != nil {
+		logrus.Errorf("do event[startwebwx] http new request error: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := self.client.Do(req)
+	if err != nil {
+		logrus.Errorf("do event[startwebwx] http do request error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	rspBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		logrus.Errorf("do event[startwebwx] ioutil ReadAll error: %v", err)
+		return
+	}
+	var callbackMsg WxResponse
+	err = json.Unmarshal(rspBody, &callbackMsg)
+	if err != nil {
+		logrus.Errorf("do event[startwebwx] json decode error: %v", err)
+		return
+	}
+	if callbackMsg.Code != WX_RESPONSE_OK {
+		logrus.Errorf("do event[startwebwx] ret error: %d %s", callbackMsg.Code, callbackMsg.Msg)
+		return
+	}
+	
 }
 
 func (self *DoEvent) callrpc(rMsg *ReceiveMsgInfo) {

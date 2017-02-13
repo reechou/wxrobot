@@ -20,6 +20,15 @@ type SendMsgInfo struct {
 	Msg      string
 }
 
+type StartWxArgv struct {
+	Url  string
+	Argv *wxweb.StartWxArgv
+}
+
+func NewStartWxArgv() *StartWxArgv {
+	return &StartWxArgv{Argv: &wxweb.StartWxArgv{}}
+}
+
 type CheckGroupChatInfo struct {
 	Group            string
 	LastChatInterval int
