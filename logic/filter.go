@@ -63,14 +63,14 @@ func (self *EventFilter) Init(eventId int, stop chan struct{}) {
 			}
 			self.DoEvent = append(self.DoEvent, DoEvent{wxm: self.wxm, Type: DO_EVENT_CALLBACK, DoMsg: doDetail[1]})
 		case DO_EVENT_START_WEB_WX:
-			if len(doDetail) != 2 || len(doDetail) != 3 {
-				logrus.Errorf("filter init error: %v", doDetail)
+			if len(doDetail) != 2 && len(doDetail) != 3 {
+				logrus.Errorf("filter init error: %v len(doDetail)=%d", doDetail, len(doDetail))
 				continue
 			}
 			startWxArgv := NewStartWxArgv()
 			startWxArgv.Url = doDetail[1]
 			if len(doDetail) == 3 {
-				argvInfo := strings.Split(doDetail[2], ",")
+				argvInfo := strings.Split(doDetail[2], "&&&")
 				for _, argvV := range argvInfo {
 					argvEqual := strings.Split(argvV, ">>>")
 					if len(argvEqual) != 2 {

@@ -66,6 +66,9 @@ func (self *EventManager) ReloadFile() {
 
 func (self *EventManager) loadFile() {
 	logrus.Debugf("start load event file")
+	if self.cfg.WxEventFile == "" {
+		return
+	}
 	defer func() {
 		logrus.Infof("load event filter: %v.", self.filters)
 		logrus.Infof("load event file[%s] success.", self.cfg.WxEventFile)

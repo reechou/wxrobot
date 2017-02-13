@@ -95,7 +95,7 @@ func (self *DoEvent) startwebwx(rMsg *ReceiveMsgInfo) {
 		logrus.Errorf("do event[startwebwx] ret error: %d %s", callbackMsg.Code, callbackMsg.Msg)
 		return
 	}
-	
+	logrus.Debugf("do event[startwebwx] rsp data: %v", callbackMsg.Data)
 }
 
 func (self *DoEvent) callrpc(rMsg *ReceiveMsgInfo) {
