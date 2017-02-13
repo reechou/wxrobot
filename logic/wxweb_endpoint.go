@@ -21,9 +21,9 @@ func (self *WxHttpSrv) StartWxWithArgv(rsp http.ResponseWriter, req *http.Reques
 	request := &wxweb.StartWxArgv{}
 	if err := json.NewDecoder(req.Body).Decode(request); err != nil {
 		logrus.Errorf("StartWxWithArgv json decode error: %v", err)
-		return nil, err
+		//return nil, err
 	}
-
+	logrus.Debugf("start wx with argv[%v]", request)
 	response := WxResponse{Code: WX_RESPONSE_OK}
 
 	startRsp := self.l.StartWxWithArgv(request)
@@ -48,8 +48,8 @@ func (self *WxHttpSrv) ReceiveSendMsgs(rsp http.ResponseWriter, req *http.Reques
 
 func (self *WxHttpSrv) ReloadEvent(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	response := WxResponse{Code: WX_RESPONSE_OK}
-	
+
 	self.l.eventMgr.ReloadFile()
-	
+
 	return response, nil
 }

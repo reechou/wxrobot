@@ -37,9 +37,12 @@ func debugPrint(content interface{}) {
 }
 
 type StartWxArgv struct {
-	IfInvite        bool   `json:"ifInvite"`
-	IfInviteEndExit bool   `json:"inviteEndExit"`
-	InviteMsg       string `json:"inviteMsg"`
+	IfInvite        bool   `json:"ifInvite,omitempty"`
+	IfInviteEndExit bool   `json:"inviteEndExit,omitempty"`
+	InviteMsg       string `json:"inviteMsg,omitempty"`
+	IfClearWx       bool   `json:"ifClearWx,omitempty"`
+	ClearWxMsg      string `json:"clearWxMsg,omitempty"`
+	ClearWxPrefix   string `json:"clearWxPrefix,omitempty"`
 }
 
 type WxHandler interface {
@@ -74,6 +77,7 @@ type WxWeb struct {
 	mediaCount     int64
 	TestUserName   string
 	QrcodeUrl      string
+	QrcodePath     string
 
 	msgReadTimestamp int64
 
@@ -165,10 +169,9 @@ func (self *WxWeb) Clear() {
 	self.Lock()
 	defer self.Unlock()
 	if !self.ifCleared {
-		qrcode := self.uuid + ".jpg"
-		err := os.Remove(qrcode)
+		err := os.Remove(self.QrcodePath)
 		if err != nil {
-			logrus.Errorf("remove qrcode[%s] error: %v", qrcode, err)
+			logrus.Errorf("remove qrcode[%s] error: %v", self.QrcodePath, err)
 		}
 		self.ifCleared = true
 	}
@@ -184,6 +187,10 @@ func (self *WxWeb) GetUin() string {
 
 func (self *WxWeb) QRCODE() string {
 	return self.QrcodeUrl
+}
+
+func (self *WxWeb) QRCODEPath() string {
+	return self.QrcodePath
 }
 
 func (self *WxWeb) IfLogin() bool {
@@ -348,15 +355,16 @@ func (self *WxWeb) genQRcode(args ...interface{}) bool {
 	urlstr += "?t=webwx"
 	urlstr += "&_=" + self._unixStr()
 	self.QrcodeUrl = urlstr
-	path := self.uuid + ".jpg"
-	out, err := os.Create(path)
+	logrus.Debugf("start wx qrcode url: %s", self.QrcodeUrl)
+	self.QrcodePath = self.cfg.QRCodeDir + self.uuid + ".jpg"
+	out, err := os.Create(self.QrcodePath)
 	resp, err := self._get(urlstr, false)
 	_, err = io.Copy(out, bytes.NewReader([]byte(resp)))
 	if err != nil {
 		return false
 	} else {
 		if runtime.GOOS == "darwin" {
-			exec.Command("open", path).Run()
+			exec.Command("open", self.QrcodePath).Run()
 		}
 		//else {
 		//	go func() {
@@ -1090,6 +1098,22 @@ func (self *WxWeb) WebwxupdatechatroomInvitemember(groupUserName string, userNam
 	}
 }
 
+func (self *WxWeb) WebwxOplog(username string, remark string) (string, bool) {
+	urlstr := fmt.Sprintf("%s/webwxoplog", self.baseUri)
+	params := make(map[string]interface{})
+	params["BaseRequest"] = self.BaseRequest
+	params["CmdId"] = 2
+	params["RemarkName"] = remark
+	params["UserName"] = username
+	data, err := self._post(urlstr, params, true)
+	if err != nil {
+		logrus.Errorf("wx oplog error: %v", err)
+		return "", false
+	} else {
+		return data, true
+	}
+}
+
 func (self *WxWeb) _init() {
 	logrus.SetLevel(logrus.DebugLevel)
 
@@ -1145,7 +1169,13 @@ func (self *WxWeb) Run() {
 	self._run("[*] 获取好友列表 ... ", self.webwxgetcontact)
 	self._run("[*] 获取群列表 ... ", self.webwxbatchgetcontact)
 	//go self.Contact.InviteMembersPic()
-	go self.Contact.InviteMembers()
+	if self.argv.IfInvite {
+		go self.Contact.InviteMembers()
+	}
+	if self.argv.IfClearWx {
+		go self.Contact.ClearWx()
+	}
+
 	//self.Contact.PrintGroupInfo()
 	self.Lock()
 	self.ifLogin = true

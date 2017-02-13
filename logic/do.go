@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/reechou/wxrobot/wxweb"
 	jsonrpc "github.com/gorilla/rpc/json"
+	"github.com/reechou/wxrobot/wxweb"
 )
 
 type DoEvent struct {
@@ -60,7 +60,7 @@ func (self *DoEvent) callrpc(rMsg *ReceiveMsgInfo) {
 		logrus.Errorf("do event[callrpc] url == nil, please change config.")
 		return
 	}
-	
+
 	message, err := jsonrpc.EncodeClientRequest("robot.callback", rMsg.msg)
 	if err != nil {
 		logrus.Errorf("[callrpc] json encode client request error: %v", err)

@@ -6,8 +6,9 @@ const (
 )
 
 type StartWxRsp struct {
-	UUID      string `json:"uuid"`
-	QrcodeUrl string `json:"qrcodeUrl"`
+	UUID       string `json:"uuid"`
+	QrcodeUrl  string `json:"qrcodeUrl"`
+	QrcodePath string `json:"qrcodePath"`
 }
 
 type WxResponse struct {

@@ -34,6 +34,7 @@ type Config struct {
 	InviteMsg    string
 
 	WxEventFile string
+	QRCodeDir   string
 
 	MemberRedis  RedisInfo
 	RankRedis    RedisInfo

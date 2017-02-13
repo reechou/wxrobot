@@ -197,6 +197,24 @@ func NewUserContact(wx *WxWeb) *UserContact {
 	}
 }
 
+func (self *UserContact) ClearWx() {
+	if self.wx.argv.IfClearWx {
+		logrus.Debugf("clear wx[%s] start.", self.wx.MyNickName)
+		for _, v := range self.Friends {
+			_, ok := self.wx.SpecialUsers[v.UserName]
+			if ok {
+				continue
+			}
+			if v.VerifyFlag == 24 {
+				continue
+			}
+			self.wx.Webwxsendmsg(self.wx.argv.ClearWxMsg, v.UserName)
+			time.Sleep(3 * time.Second)
+		}
+		logrus.Debugf("clear wx[%s] end.", self.wx.MyNickName)
+	}
+}
+
 func (self *UserContact) InviteMembersPic() {
 	if self.wx.cfg.IfInvite {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))

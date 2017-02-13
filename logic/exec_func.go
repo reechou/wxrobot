@@ -27,7 +27,7 @@ func ExecCheckEqualFunc(f, value string) bool {
 		v := strings.Replace(f, EQUAL, "", -1)
 		return value == v
 	}
-	
+
 	return true
 }
 

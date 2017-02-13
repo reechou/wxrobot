@@ -41,3 +41,9 @@ const (
 	WX_VERIFY_USER_OP_ADD     = 2
 	WX_VERIFY_USER_OP_CONFIRM = 3
 )
+
+const (
+	MSG_MEDIA_KEYWORD       = "CDATA"
+	CLEAR_WX_PREFIX_DEFAULT = "A已被删除"
+	WX_SYSTEM_NOT_FRIEND    = "开启了朋友验证"
+)

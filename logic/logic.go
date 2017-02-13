@@ -85,8 +85,9 @@ func (self *WxLogic) StartWxWithArgv(argv *wxweb.StartWxArgv) *StartWxRsp {
 	self.Unlock()
 
 	rsp := &StartWxRsp{
-		UUID:      wx.UUID(),
-		QrcodeUrl: wx.QRCODE(),
+		UUID:       wx.UUID(),
+		QrcodeUrl:  wx.QRCODE(),
+		QrcodePath: wx.QRCODEPath(),
 	}
 
 	return rsp

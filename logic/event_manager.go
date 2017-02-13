@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/config"
@@ -16,9 +16,9 @@ import (
 
 type EventManager struct {
 	sync.Mutex
-	
+
 	eventId int
-	
+
 	wxm *WxManager
 	cfg *config.Config
 
@@ -58,7 +58,7 @@ func (self *EventManager) Reset() {
 func (self *EventManager) ReloadFile() {
 	self.Lock()
 	defer self.Unlock()
-	
+
 	self.Reset()
 	self.loadFile()
 	go self.Run()

@@ -3,6 +3,7 @@ package wxweb
 import (
 	//"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -33,8 +34,12 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		if contactList != nil {
 			for _, v := range contactList {
 				modContact := v.(map[string]interface{})
+				if modContact == nil {
+					continue
+				}
 				userName := modContact["UserName"].(string)
 				if strings.HasPrefix(userName, GROUP_PREFIX) {
+					// 群成员变化
 					groupContactFlag := modContact["ContactFlag"].(int)
 					groupNickName := modContact["NickName"].(string)
 					group := self.Contact.Groups[userName]
@@ -65,6 +70,28 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					group.MemberList = memberListMap
 					self.Contact.Groups[userName] = group
 					self.Contact.NickGroups[groupNickName] = group
+				} else {
+					// 新好友
+					userContactFlag := modContact["ContactFlag"].(int)
+					userVerifyFlag := modContact["VerifyFlag"].(int)
+					userNickName := modContact["NickName"].(string)
+					alias := modContact["Alias"].(string)
+					city := modContact["City"].(string)
+					sex := modContact["Sex"].(int)
+					user := self.Contact.Friends[userName]
+					if user == nil {
+						uf := &UserFriend{
+							Alias:       alias,
+							City:        city,
+							VerifyFlag:  userVerifyFlag,
+							ContactFlag: userContactFlag,
+							NickName:    userNickName,
+							Sex:         sex,
+							UserName:    userName,
+						}
+						self.Contact.Friends[userName] = uf
+						self.Contact.NickFriends[userNickName] = uf
+					}
 				}
 			}
 		}
@@ -97,6 +124,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		// 文本消息
 		if msgType == MSG_TYPE_TEXT {
 			//logrus.Debugf("text msg: %s", content)
+			if strings.Contains(content, MSG_MEDIA_KEYWORD) {
+				continue
+			}
 			if fromUserName[:2] == GROUP_PREFIX {
 				contentSlice := strings.Split(content, ":<br/>")
 				people := contentSlice[0]
@@ -145,6 +175,22 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			//	}
 			//	//group.AppendInviteMsg(&MsgInfo{WXMsgId: msgid, Content: content})
 			//}
+
+			// 系统消息不是好友
+			if strings.Contains(content, WX_SYSTEM_NOT_FRIEND) {
+				if self.argv.IfClearWx {
+					prefix := self.argv.ClearWxPrefix
+					if prefix == "" {
+						prefix = CLEAR_WX_PREFIX_DEFAULT
+					}
+					user := self.Contact.Friends[fromUserName]
+					userNick := ""
+					if user != nil {
+						userNick = user.NickName
+					}
+					self.WebwxOplog(fromUserName, fmt.Sprintf("%s %s", prefix, userNick))
+				}
+			}
 		} else if msgType == MSG_TYPE_VERIFY_USER {
 			recommendInfo := msg["RecommendInfo"]
 			if recommendInfo == nil {
