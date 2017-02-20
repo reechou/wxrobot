@@ -65,7 +65,10 @@ func (self *WxHttpSrv) httpWrap(handler HttpHandler) func(rsp http.ResponseWrite
 			rsp.Write([]byte(errMsg))
 			return
 		}
-
+		
+		rsp.Header().Set("Access-Control-Allow-Origin", "*")
+		rsp.Header().Set("Access-Control-Allow-Methods", "POST")
+		rsp.Header().Set("Access-Control-Allow-Headers", "x-requested-with,content-type")
 		// return json object
 		if obj != nil {
 			var buf []byte

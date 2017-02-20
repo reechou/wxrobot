@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+	"net/url"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -28,6 +30,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		return
 	}
 
+	//logrus.Debugf("msg: %v", msgSource)
 	modContactList := msgSource["ModContactList"]
 	if modContactList != nil {
 		contactList := modContactList.([]interface{})
@@ -72,6 +75,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					self.Contact.NickGroups[groupNickName] = group
 				} else {
 					// 新好友
+					//logrus.Debugf("new friend: %v", modContact)
 					userContactFlag := modContact["ContactFlag"].(int)
 					userVerifyFlag := modContact["VerifyFlag"].(int)
 					userNickName := modContact["NickName"].(string)
@@ -80,17 +84,41 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					sex := modContact["Sex"].(int)
 					user := self.Contact.Friends[userName]
 					if user == nil {
+						realName := userNickName
+						_, ok := self.Contact.NickFriends[realName]
+						if ok {
+							realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
+							self.WebwxOplog(userName, realName)
+						}
+
 						uf := &UserFriend{
 							Alias:       alias,
 							City:        city,
 							VerifyFlag:  userVerifyFlag,
 							ContactFlag: userContactFlag,
 							NickName:    userNickName,
+							RemarkName:  realName,
 							Sex:         sex,
 							UserName:    userName,
 						}
 						self.Contact.Friends[userName] = uf
-						self.Contact.NickFriends[userNickName] = uf
+						self.Contact.NickFriends[realName] = uf
+
+						receiveMsg := &ReceiveMsgInfo{}
+						receiveMsg.BaseInfo.Uin = self.uin
+						receiveMsg.BaseInfo.UserName = self.MyUserName
+						receiveMsg.BaseInfo.WechatNick = self.MyNickName
+						receiveMsg.BaseInfo.FromNickName = realName
+						receiveMsg.BaseInfo.FromUserName = userName
+						receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD
+						receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
+						receiveMsg.AddFriend.UserWechat = uf.Alias
+						receiveMsg.AddFriend.UserNick = realName
+						receiveMsg.AddFriend.UserCity = uf.City
+						receiveMsg.AddFriend.UserSex = uf.Sex
+						if receiveMsg.BaseInfo.ReceiveEvent != "" {
+							self.wxh.ReceiveMsg(receiveMsg)
+						}
 					}
 				}
 			}
@@ -119,11 +147,13 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		msgid := msg["MsgId"].(string)
 		receiveMsg := &ReceiveMsgInfo{}
 		receiveMsg.BaseInfo.Uin = self.uin
+		receiveMsg.BaseInfo.UserName = self.MyUserName
 		receiveMsg.BaseInfo.WechatNick = self.MyNickName
 		receiveMsg.BaseInfo.FromUserName = fromUserName
 		// 文本消息
-		if msgType == MSG_TYPE_TEXT {
+		if msgType == MSG_TYPE_TEXT || msgType == MSG_TYPE_IMG || msgType == MSG_TYPE_VOICE || msgType == MSG_TYPE_VIDEO {
 			//logrus.Debugf("text msg: %s", content)
+			receiveMsg.MsgType = RECEIVE_MSG_MAP[msgType]
 			if strings.Contains(content, MSG_MEDIA_KEYWORD) {
 				continue
 			}
@@ -155,15 +185,30 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.BaseInfo.FromNickName = sendPeople.NickName
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
 			} else {
-				uf, ok := self.Contact.Friends[receiveMsg.BaseInfo.FromUserName]
-				if ok {
-					receiveMsg.BaseInfo.FromNickName = uf.NickName
+				if receiveMsg.BaseInfo.FromUserName == self.MyUserName {
+					receiveMsg.BaseInfo.FromNickName = self.MyNickName
+					toUserName := msg["ToUserName"].(string)
+					receiveMsg.BaseToUserInfo.ToUserName = toUserName
+					uf, ok := self.Contact.Friends[toUserName]
+					if ok {
+						receiveMsg.BaseToUserInfo.ToNickName = uf.RemarkName
+					}
+				} else {
+					uf, ok := self.Contact.Friends[receiveMsg.BaseInfo.FromUserName]
+					if ok {
+						receiveMsg.BaseInfo.FromNickName = uf.RemarkName
+					}
 				}
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
 				self.webwxstatusnotifyMsgRead(receiveMsg.BaseInfo.FromUserName)
 			}
 			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MSG
-			receiveMsg.Msg = content
+			if msgType == MSG_TYPE_TEXT {
+				receiveMsg.Msg = content
+			} else {
+				receiveMsg.Msg = RECEIVE_MSG_CONTENT_MAP[msgType]
+				receiveMsg.MediaTempUrl = self.msgUrlMap[msgType](msgid)
+			}
 		} else if msgType == MSG_TYPE_INIT {
 			//logrus.Debug("[*] 成功截获微信初始化消息")
 		} else if msgType == MSG_TYPE_SYSTEM {
@@ -206,12 +251,6 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			ticket := rInfo["Ticket"].(string)
 			userName := rInfo["UserName"].(string)
 			nickName := rInfo["NickName"].(string)
-
-			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD_FRIEND
-			receiveMsg.BaseInfo.FromNickName = nickName
-			receiveMsg.BaseInfo.FromUserName = userName
-			receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
-			receiveMsg.AddFriend.Ticket = ticket
 
 			logrus.Debugf("addfriend conteng: %s", content)
 			//var addFriendContent AddFriendContent
@@ -260,6 +299,19 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			sex = strings.Replace(sex, "sex=", "", -1)
 			sexInt, _ := strconv.Atoi(sex)
 
+			realName := nickName
+			_, ok := self.Contact.NickFriends[realName]
+			if ok {
+				realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
+				self.WebwxOplog(userName, realName)
+			}
+
+			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD_FRIEND
+			receiveMsg.BaseInfo.FromNickName = realName
+			receiveMsg.BaseInfo.FromUserName = userName
+			receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
+			receiveMsg.AddFriend.Ticket = ticket
+
 			receiveMsg.AddFriend.SourceWechat = sourceusername
 			receiveMsg.AddFriend.SourceNick = sourcenickname
 			receiveMsg.AddFriend.UserWxid = fromusername
@@ -272,22 +324,35 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			//} else {
 			//	receiveMsg.AddFriend.UserWechat = alias
 			//}
-			receiveMsg.AddFriend.UserNick = fromnickname
+			receiveMsg.AddFriend.UserNick = realName
+			receiveMsg.AddFriend.UserCity = city
+			receiveMsg.AddFriend.UserSex = sexInt
 
 			uf := &UserFriend{
-				Alias:    alias,
-				City:     city,
-				NickName: nickName,
-				Sex:      sexInt,
-				UserName: userName,
+				Alias:      alias,
+				City:       city,
+				NickName:   nickName,
+				RemarkName: realName,
+				Sex:        sexInt,
+				UserName:   userName,
 			}
 			self.Contact.Friends[userName] = uf
-			self.Contact.NickFriends[nickName] = uf
+			self.Contact.NickFriends[realName] = uf
 		}
 		if receiveMsg.BaseInfo.ReceiveEvent != "" {
-			//s, _ := json.Marshal(receiveMsg)
-			//logrus.Debug(string(s))
 			self.wxh.ReceiveMsg(receiveMsg)
 		}
 	}
+}
+
+func (self *WxWeb) getMsgImgUrl(msgId string) string {
+	return fmt.Sprintf("%s/webwxgetmsgimg?MsgID=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
+}
+
+func (self *WxWeb) getMsgVoiceUrl(msgId string) string {
+	return fmt.Sprintf("%s/webwxgetvoice?msgid=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
+}
+
+func (self *WxWeb) getMsgVideoUrl(msgId string) string {
+	return fmt.Sprintf("%s/webwxgetvideo?msgid=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
 }

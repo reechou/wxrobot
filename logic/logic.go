@@ -6,6 +6,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/config"
+	"github.com/reechou/wxrobot/ext"
+	"github.com/reechou/wxrobot/models"
 	"github.com/reechou/wxrobot/wxweb"
 )
 
@@ -18,6 +20,7 @@ type WxLogic struct {
 	wxSrv    *WxHttpSrv
 	wxMgr    *WxManager
 	eventMgr *EventManager
+	raExt    *ext.RobotAccount
 
 	stop chan struct{}
 	done chan struct{}
@@ -37,6 +40,9 @@ func NewWxLogic(cfg *config.Config) *WxLogic {
 	l.wxSrv = NewWxHTTPServer(cfg, l)
 	l.wxMgr = NewWxManager()
 	l.eventMgr = NewEventManager(l.wxMgr, cfg)
+	l.raExt = ext.NewRobotAccount(cfg)
+
+	models.InitDB(cfg)
 
 	//err := l.memberRedis.StartAndGC()
 	//if err != nil {
@@ -131,6 +137,14 @@ func (self *WxLogic) Logout(uuid string) {
 
 func (self *WxLogic) ReceiveMsg(msg *wxweb.ReceiveMsgInfo) {
 	self.eventMgr.ReceiveMsg(msg)
+}
+
+func (self *WxLogic) RobotAddFriends(robot string, friends []wxweb.UserFriend) {
+	req := &ext.RobotSaveFriendsReq{
+		RobotWx: robot,
+		Friends: friends,
+	}
+	self.raExt.RobotAddFriends(req)
 }
 
 func (self *WxLogic) runCheck() {

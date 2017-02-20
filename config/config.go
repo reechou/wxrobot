@@ -22,6 +22,10 @@ type RedisInfo struct {
 	Password string
 }
 
+type RobotAccount struct {
+	Host string
+}
+
 type Config struct {
 	Debug   bool
 	Path    string
@@ -39,6 +43,9 @@ type Config struct {
 	MemberRedis  RedisInfo
 	RankRedis    RedisInfo
 	SessionRedis RedisInfo
+
+	DBInfo
+	RobotAccount
 }
 
 func NewConfig() *Config {

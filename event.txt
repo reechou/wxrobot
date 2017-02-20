@@ -1,6 +1,7 @@
-filter 铅笔 anytime receivemsg include()http,买,找,下一个 $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
-filter 铅笔 anytime receivemsg equal()个人信息,订单查询,下线查询,1,4,3 $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
-filter 铅笔 anytime receivemsg equal()签到,2 $empty people sendmsg^people^$from^text>>>正在操作中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
-filter 铅笔 anytime receivemsg equal()提现,帮助,5,6 $empty people callback^http://127.0.0.1:6869/robot_call
-filter 铅笔 anytime receivemsg equal()清理微信,777 $empty people startwebwx^http://127.0.0.1:7171/startwx2^IfClearWx>>>true&&&ClearWxMsg>>>清理微信,请忽略消息
-filter 铅笔 anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>Hi,我是“便宜淘”,当今最牛逼的淘宝返利机器人。\n通过我不仅可以自动找到内部优惠券，还可以领取返利，平均帮您优惠30%-60%，一年省下1000元。\n\n优惠只需以下4步:\n第1步:【手机淘宝】上选择你要购买的商品，点击[分享]-[复制链接]发送给我\n第2步:我就会帮你查到这个商品的所有可用优惠券和返现\n第3步:长按复制返回的消息，打开【手机淘宝】领券购买\n第4步:交易成功后获得返现\n\n*偷偷告诉你,将我的名片分享给小伙伴,您的小伙伴也将自动成为您的下线，您就可以额外获得他购买商品返现的20%哦。\n详细功能查询请回复：“6”或“帮助”\n点击下方链接了解具体规则。\nhttp://t.cn/RJwZCu0|||callback^http://127.0.0.1:6869/robot_call
+filter 群主助手 anytime receivemsg include()http,买,找,下一个 $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
+filter 群主助手 anytime receivemsg equal()个人信息,订单查询,下线查询,1,4,3 $empty people sendmsg^people^$from^text>>>正在查询中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
+filter 群主助手 anytime receivemsg equal()签到,2 $empty people sendmsg^people^$from^text>>>正在操作中,请稍后...|||callback^http://127.0.0.1:6869/robot_call
+filter 群主助手 anytime receivemsg equal()提现,帮助,5,6 $empty people callback^http://127.0.0.1:6869/robot_call
+filter 群主助手 anytime receivemsg equal()清理微信,777 $empty people startwebwx^http://127.0.0.1:7171/startwx2^IfClearWx>>>true&&&ClearWxMsg>>>清理微信,请忽略消息
+filter 群主助手 anytime addfriend $empty $empty people verifyuser|||sendmsg^people^$from^text>>>Hi,我是“便宜淘”,当今最牛逼的淘宝返利机器人。\n通过我不仅可以自动找到内部优惠券，还可以领取返利，平均帮您优惠30%-60%，一年省下1000元。\n\n优惠只需以下4步:\n第1步:【手机淘宝】上选择你要购买的商品，点击[分享]-[复制链接]发送给我\n第2步:我就会帮你查到这个商品的所有可用优惠券和返现\n第3步:长按复制返回的消息，打开【手机淘宝】领券购买\n第4步:交易成功后获得返现\n\n*偷偷告诉你,将我的名片分享给小伙伴,您的小伙伴也将自动成为您的下线，您就可以额外获得他购买商品返现的20%哦。\n详细功能查询请回复：“6”或“帮助”\n点击下方链接了解具体规则。\nhttp://t.cn/RJwZCu0|||callback^http://127.0.0.1:6869/robot_call
+filter allwechat anytime allevent $empty $empty people callback^http://127.0.0.1:8384/robot/receive_msg

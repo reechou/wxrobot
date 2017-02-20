@@ -5,22 +5,30 @@ import (
 	"strings"
 	"sync"
 	"time"
-
+	"os"
+	"net"
+	
 	"github.com/Sirupsen/logrus"
+	"github.com/reechou/wxrobot/models"
 )
 
 const (
 	MSG_LEN = 100
 )
 
+var (
+	HostIP string
+)
+
 type UserFriend struct {
-	Alias       string
-	City        string
-	VerifyFlag  int
-	ContactFlag int
-	NickName    string
-	Sex         int
-	UserName    string
+	Alias       string `json:"alias"`
+	City        string `json:"city"`
+	VerifyFlag  int    `json:"verifyFlag"`
+	ContactFlag int    `json:"contactFlag"`
+	NickName    string `json:"nickName"`
+	RemarkName  string `json:"remarkName"`
+	Sex         int    `json:"sex"`
+	UserName    string `json:"userName"`
 }
 
 type GroupUserInfo struct {
@@ -197,6 +205,68 @@ func NewUserContact(wx *WxWeb) *UserContact {
 	}
 }
 
+func (self *UserContact) setIpPort(r *models.Robot) {
+	r.Ip = HostIP
+	r.OfPort = self.wx.cfg.Host
+}
+
+func (self *UserContact) SaveRobotFriends() {
+	if self.wx.argv.IfSaveRobot {
+		robot := &models.Robot{
+			RobotWx: self.wx.MyNickName,
+		}
+		has, err := models.GetRobot(robot)
+		if err != nil {
+			logrus.Errorf("get robot error: %v", err)
+			return
+		}
+		if has {
+			if robot.IfSaveFriend != 0 {
+				logrus.Debugf("Robot[%s] has saved.", self.wx.MyNickName)
+				self.setIpPort(robot)
+				err = models.UpdateRobotSave(robot)
+				if err != nil {
+					logrus.Errorf("update robot save error: %v", err)
+				}
+				return
+			}
+		} else {
+			self.setIpPort(robot)
+			err = models.CreateRobot(robot)
+			if err != nil {
+				logrus.Errorf("create robot error: %v", err)
+				return
+			}
+		}
+		var list []UserFriend
+		for _, v := range self.Friends {
+			_, ok := self.wx.SpecialUsers[v.UserName]
+			if ok {
+				continue
+			}
+			if v.VerifyFlag != WX_FRIEND_VERIFY_FLAG_USER {
+				continue
+			}
+			list = append(list, *v)
+			if len(list) >= 20 {
+				self.wx.wxh.RobotAddFriends(self.wx.MyNickName, list)
+				list = nil
+				time.Sleep(time.Second)
+			}
+		}
+		if list != nil {
+			self.wx.wxh.RobotAddFriends(self.wx.MyNickName, list)
+			list = nil
+		}
+		robot.IfSaveFriend = 1
+		self.setIpPort(robot)
+		err = models.UpdateRobotSave(robot)
+		if err != nil {
+			logrus.Errorf("update robot save error: %v", err)
+		}
+	}
+}
+
 func (self *UserContact) ClearWx() {
 	if self.wx.argv.IfClearWx {
 		logrus.Debugf("clear wx[%s] start.", self.wx.MyNickName)
@@ -205,7 +275,7 @@ func (self *UserContact) ClearWx() {
 			if ok {
 				continue
 			}
-			if v.VerifyFlag == 24 {
+			if v.VerifyFlag != WX_FRIEND_VERIFY_FLAG_USER {
 				continue
 			}
 			self.wx.Webwxsendmsg(self.wx.argv.ClearWxMsg, v.UserName)
@@ -265,7 +335,7 @@ func (self *UserContact) InviteMembers() {
 				if ok {
 					continue
 				}
-				if v.VerifyFlag == 24 {
+				if v.VerifyFlag != WX_FRIEND_VERIFY_FLAG_USER {
 					continue
 				}
 				memberList = append(memberList, v.UserName)
@@ -342,4 +412,27 @@ func (self *UserContact) PrintGroupInfo() {
 	}
 	//logrus.Info("[*] REAL-群组数:", allGroupNum)
 	//logrus.Info("[*] REAL-去重群成员总数:", len(members), cfNum)
+}
+
+func GetHostName() string {
+	hostName, err := os.Hostname()
+	if err != nil {
+		logrus.Errorf("GetHostName error: %v", err.Error())
+		return ""
+	}
+	return hostName
+}
+
+func GetLocalIP(hostName string) string {
+	ipAddress, err := net.ResolveIPAddr("ip", hostName)
+	if err != nil {
+		logrus.Errorf("GetLocalIP error: %v", err.Error())
+		return ""
+	}
+	return ipAddress.String()
+}
+
+func init() {
+	hostName := GetHostName()
+	HostIP = GetLocalIP(hostName)
 }

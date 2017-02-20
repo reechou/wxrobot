@@ -51,7 +51,7 @@ func (self *WxManager) UnregisterWx(wx *wxweb.WxWeb) {
 func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 	wx := self.wxs[msg.WeChat]
 	if wx == nil {
-		logrus.Errorf("unknown this wechat[%s].", msg.WeChat)
+		logrus.Errorf("send msg unknown this wechat[%s].", msg.WeChat)
 		return
 	}
 	switch msg.ChatType {
@@ -59,6 +59,18 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 		var userName string
 		if msg.UserName != "" {
 			userName = msg.UserName
+			uf := wx.Contact.Friends[userName]
+			if uf == nil {
+				uf := wx.Contact.NickFriends[msg.Name]
+				if uf == nil {
+					logrus.Errorf("unkown this friend[%s]", msg.Name)
+					return
+				}
+				userName = uf.UserName
+				logrus.Debugf("send msg to people find username[%s] from name[%s]", userName, msg.Name)
+			} else {
+				logrus.Debugf("send msg to people find username[%s] from request", userName)
+			}
 		} else {
 			uf := wx.Contact.NickFriends[msg.Name]
 			if uf == nil {
@@ -86,6 +98,18 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 		if msg.MsgType == MSG_TYPE_TEXT {
 			wx.Webwxsendmsg(msgStr, userName)
 		}
+	}
+}
+
+func (self *WxManager) SendImgMsg(msg *SendImgInfo) {
+	wx := self.wxs[msg.WeChat]
+	if wx == nil {
+		logrus.Errorf("send img msg unknown this wechat[%s].", msg.WeChat)
+		return
+	}
+	mediaId, ok := wx.Webwxuploadmedia(msg.UserName, msg.ImgPath)
+	if ok {
+		wx.Webwxsendmsgimg(msg.UserName, mediaId)
 	}
 }
 

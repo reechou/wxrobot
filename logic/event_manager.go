@@ -82,7 +82,7 @@ func (self *EventManager) loadFile() {
 	buf := bufio.NewReader(f)
 	for {
 		line, _, err := buf.ReadLine()
-		logrus.Debug("************* ", string(line))
+		//logrus.Debug("************* ", string(line))
 		//line, err := buf.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
@@ -158,6 +158,17 @@ func (self *EventManager) Run() {
 			if ok {
 				for _, v := range fs {
 					//logrus.Debugf("find filter: %v", *v)
+					select {
+					case v.GetMsgChan() <- msg:
+					case <-msg.ctx.Done():
+						logrus.Errorf("receive msg into filter msg channal error: %v", msg.ctx.Err())
+						continue
+					}
+				}
+			}
+			fsa, ok := self.filters[ALLWECHAT]
+			if ok {
+				for _, v := range fsa {
 					select {
 					case v.GetMsgChan() <- msg:
 					case <-msg.ctx.Done():

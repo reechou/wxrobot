@@ -62,7 +62,7 @@ func (self *DoEvent) startwebwx(rMsg *ReceiveMsgInfo) {
 	if self.client == nil {
 		self.client = &http.Client{}
 	}
-	
+
 	reqBytes, err := json.Marshal(argv.Argv)
 	if err != nil {
 		logrus.Errorf("do event[startwebwx] json encode error: %v", err)
@@ -96,6 +96,23 @@ func (self *DoEvent) startwebwx(rMsg *ReceiveMsgInfo) {
 		return
 	}
 	logrus.Debugf("do event[startwebwx] rsp data: %v", callbackMsg.Data)
+	dataMap := callbackMsg.Data.(map[string]interface{})
+	if dataMap == nil {
+		logrus.Errorf("do event[startwebwx] datamap is nil")
+		return
+	}
+	qrcodePath := dataMap["qrcodePath"]
+	if qrcodePath == nil {
+		logrus.Errorf("do event[startwebwx] qrcodePath is nil")
+		return
+	}
+	qrcodePathStr := qrcodePath.(string)
+	msg := &SendImgInfo{
+		WeChat:   rMsg.msg.BaseInfo.WechatNick,
+		UserName: rMsg.msg.BaseInfo.FromUserName,
+		ImgPath:  qrcodePathStr,
+	}
+	self.wxm.SendImgMsg(msg)
 }
 
 func (self *DoEvent) callrpc(rMsg *ReceiveMsgInfo) {

@@ -20,6 +20,12 @@ type SendMsgInfo struct {
 	Msg      string
 }
 
+type SendImgInfo struct {
+	WeChat   string
+	UserName string
+	ImgPath  string
+}
+
 type StartWxArgv struct {
 	Url  string
 	Argv *wxweb.StartWxArgv

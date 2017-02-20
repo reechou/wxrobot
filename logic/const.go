@@ -2,6 +2,7 @@ package logic
 
 // 变量
 const (
+	ALLWECHAT = "allwechat"
 	EMPTY     = "$empty"
 	FROMGROUP = "$fromgroup"
 	FROMUSER  = "$fromuser"
@@ -37,6 +38,7 @@ const (
 )
 
 const (
+	DO_EVENT_ALL_EVENT    = "allevent"
 	DO_EVENT_SENDMSG      = "sendmsg"
 	DO_EVENT_VERIFY_USER  = "verifyuser"
 	DO_EVENT_CALLBACK     = "callback"

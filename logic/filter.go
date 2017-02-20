@@ -111,7 +111,9 @@ func (self *EventFilter) Run() {
 		case msg := <-self.msgChan:
 			//logrus.Debugf("filter msg: %v", msg.msg)
 			if self.Event != msg.msg.BaseInfo.ReceiveEvent {
-				continue
+				if self.Event != DO_EVENT_ALL_EVENT {
+					continue
+				}
 			}
 			if self.FromType != "" {
 				if self.FromType != msg.msg.BaseInfo.FromType {
