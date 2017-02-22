@@ -47,9 +47,10 @@ type ReceiveMsgInfo struct {
 	BaseToUserInfo `json:"baseToUserIno,omitempty"`
 	AddFriend      `json:"addFriend,omitempty"`
 
-	MsgType      string `json:"msgType,omitempty"`
-	Msg          string `json:"msg,omitempty"`
-	MediaTempUrl string `json:"mediaTempUrl,omitempty"`
+	MsgType        string `json:"msgType,omitempty"`
+	Msg            string `json:"msg,omitempty"`
+	MediaTempUrl   string `json:"mediaTempUrl,omitempty"`
+	GroupMemberNum int    `json:"groupMemberNum,omitempty"`
 }
 
 type CallbackMsgInfo struct {

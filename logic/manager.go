@@ -4,19 +4,26 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"io"
+	"crypto/md5"
+	"os"
+	"net/http"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/wxweb"
+	"github.com/reechou/wxrobot/config"
 )
 
 type WxManager struct {
 	sync.Mutex
 	wxs map[string]*wxweb.WxWeb
+	cfg *config.Config
 }
 
-func NewWxManager() *WxManager {
+func NewWxManager(cfg *config.Config) *WxManager {
 	wm := &WxManager{
 		wxs: make(map[string]*wxweb.WxWeb),
+		cfg: cfg,
 	}
 	return wm
 }
@@ -25,7 +32,7 @@ func (self *WxManager) RegisterWx(wx *wxweb.WxWeb) {
 	self.Lock()
 	defer self.Unlock()
 
-	nickName, ok := wx.User["NickName"]
+	nickName, ok := wx.Session.User["NickName"]
 	if ok {
 		nick := nickName.(string)
 		self.wxs[nick] = wx
@@ -37,7 +44,7 @@ func (self *WxManager) UnregisterWx(wx *wxweb.WxWeb) {
 	self.Lock()
 	defer self.Unlock()
 
-	nickName, ok := wx.User["NickName"]
+	nickName, ok := wx.Session.User["NickName"]
 	if ok {
 		nick := nickName.(string)
 		_, ok := self.wxs[nick]
@@ -82,21 +89,70 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 		if msg.MsgType == MSG_TYPE_TEXT {
 			wx.Webwxsendmsg(msgStr, userName)
 		} else if msg.MsgType == MSG_TYPE_IMG {
-			mediaId, ok := wx.Webwxuploadmedia(userName, msg.Msg)
-			if ok {
-				wx.Webwxsendmsgimg(userName, mediaId)
-			}
+			self.sendImg(userName, msgStr, wx)
 		}
 	case CHAT_TYPE_GROUP:
 		var userName string
-		group := wx.Contact.NickGroups[msg.Name]
-		if group == nil {
-			logrus.Errorf("unkown this group[%s]", msg.Name)
-			return
+		if msg.UserName != "" {
+			userName = msg.UserName
+			group := wx.Contact.Groups[userName]
+			if group == nil {
+				group := wx.Contact.NickGroups[msg.Name]
+				if group == nil {
+					logrus.Errorf("unkown this group[%s]", msg.Name)
+					return
+				}
+				userName = group.UserName
+				logrus.Debugf("send msg to group find username[%s] from name[%s]", userName, msg.Name)
+			} else {
+				logrus.Debugf("send msg to group find username[%s] from request", userName)
+			}
+		} else {
+			group := wx.Contact.NickGroups[msg.Name]
+			if group == nil {
+				logrus.Errorf("unkown this group[%s]", msg.Name)
+				return
+			}
+			userName = group.UserName
 		}
-		userName = group.UserName
 		if msg.MsgType == MSG_TYPE_TEXT {
 			wx.Webwxsendmsg(msgStr, userName)
+		} else if msg.MsgType == MSG_TYPE_IMG {
+			self.sendImg(userName, msgStr, wx)
+		}
+	}
+}
+
+func (self *WxManager) sendImg(userName, imgMsg string, wx *wxweb.WxWeb) {
+	if strings.HasPrefix(imgMsg, "http") {
+		logrus.Debugf("send img[%s] to username[%s]", imgMsg, userName)
+		imgPath := fmt.Sprintf("%s/%s.jpg", self.cfg.TempPicDir, fmt.Sprintf("%x", md5.Sum([]byte(imgMsg))))
+		if !PathExist(imgPath) {
+			logrus.Debugf("img[%s] not exist", imgPath)
+			res, err := http.Get(imgMsg)
+			if err != nil {
+				logrus.Errorf("http get img[%s] error: %v", imgMsg, err)
+				return
+			}
+			out, err := os.Create(imgPath)
+			if err != nil {
+				logrus.Errorf("os create img[%s] error: %v", imgPath, err)
+				return
+			}
+			_, err = io.Copy(out, res.Body)
+			if err != nil {
+				logrus.Errorf("io copy img[%s] error: %v", imgPath, err)
+				return
+			}
+		}
+		mediaId, ok := wx.Webwxuploadmedia(userName, imgPath)
+		if ok {
+			wx.Webwxsendmsgimg(userName, mediaId)
+		}
+	} else {
+		mediaId, ok := wx.Webwxuploadmedia(userName, imgMsg)
+		if ok {
+			wx.Webwxsendmsgimg(userName, mediaId)
 		}
 	}
 }
@@ -119,11 +175,13 @@ func (self *WxManager) VerifyUser(msg *wxweb.ReceiveMsgInfo) bool {
 		logrus.Errorf("unknown this wechat[%s].", msg.BaseInfo.WechatNick)
 		return false
 	}
-	ok := wx.Webwxverifyuser(wxweb.WX_VERIFY_USER_OP_CONFIRM, "", msg.AddFriend.Ticket, msg.BaseInfo.FromUserName)
+	realName, ok := wx.Webwxverifyuser(wxweb.WX_VERIFY_USER_OP_CONFIRM, "", msg.AddFriend.Ticket, msg.BaseInfo.FromUserName, msg.BaseInfo.FromNickName)
 	if ok {
-		logrus.Infof("verigy user[%s] success.", msg.BaseInfo.FromNickName)
+		logrus.Infof("verify user[%s] success, and remark name[%s]", msg.BaseInfo.FromNickName, realName)
+		msg.BaseInfo.FromNickName = realName
+		msg.AddFriend.UserNick = realName
 	} else {
-		logrus.Infof("verigy user[%s] error.", msg.BaseInfo.FromNickName)
+		logrus.Infof("verify user[%s] error.", msg.BaseInfo.FromNickName)
 	}
 	return ok
 }
@@ -163,4 +221,9 @@ func (self *WxManager) StateGroupNum(wechat, g string) string {
 
 func (self *WxManager) CheckGroupChat(info *CheckGroupChatInfo) {
 
+}
+
+func PathExist(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil || os.IsExist(err)
 }

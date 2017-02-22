@@ -39,6 +39,7 @@ type Config struct {
 
 	WxEventFile string
 	QRCodeDir   string
+	TempPicDir  string
 
 	MemberRedis  RedisInfo
 	RankRedis    RedisInfo

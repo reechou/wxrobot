@@ -16,7 +16,8 @@ const (
 )
 
 const (
-	WEBWX_SYNC_INTERVAL = 2
+	WEBWX_SYNC_INTERVAL            = 2
+	WEBWX_HANDLE_MSG_SYNC_INTERVAL = 1
 )
 
 const (
@@ -30,11 +31,12 @@ const (
 )
 
 const (
-	FROM_TYPE_PEOPLE         = "people"
-	FROM_TYPE_GROUP          = "group"
-	RECEIVE_EVENT_MSG        = "receivemsg"
-	RECEIVE_EVENT_ADD_FRIEND = "addfriend"
-	RECEIVE_EVENT_ADD        = "receiveadd"
+	FROM_TYPE_PEOPLE            = "people"
+	FROM_TYPE_GROUP             = "group"
+	RECEIVE_EVENT_MSG           = "receivemsg"
+	RECEIVE_EVENT_MOD_GROUP_ADD = "modgroupadd"
+	RECEIVE_EVENT_ADD_FRIEND    = "addfriend"
+	RECEIVE_EVENT_ADD           = "receiveadd"
 )
 
 const (
@@ -43,7 +45,9 @@ const (
 	RECEIVE_MSG_TYPE_VOICE = "voice"
 	RECEIVE_MSG_TYPE_VIDEO = "video"
 )
+
 type msgUrlHandle func(string) string
+
 var (
 	RECEIVE_MSG_MAP = map[int]string{
 		MSG_TYPE_TEXT:  RECEIVE_MSG_TYPE_TEXT,
@@ -67,6 +71,8 @@ const (
 	MSG_MEDIA_KEYWORD       = "CDATA"
 	CLEAR_WX_PREFIX_DEFAULT = "A已被删除"
 	WX_SYSTEM_NOT_FRIEND    = "开启了朋友验证"
+	WX_SYSTEM_MSG_INVITE    = "邀请"
+	WX_SYSTEM_MSG_SCAN      = "扫描"
 )
 
 const (

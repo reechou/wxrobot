@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/reechou/wxrobot/wxweb"
 )
 
 type EventFilter struct {
@@ -113,6 +114,10 @@ func (self *EventFilter) Run() {
 			if self.Event != msg.msg.BaseInfo.ReceiveEvent {
 				if self.Event != DO_EVENT_ALL_EVENT {
 					continue
+				} else {
+					if msg.msg.BaseInfo.ReceiveEvent == wxweb.RECEIVE_EVENT_ADD_FRIEND {
+						continue
+					}
 				}
 			}
 			if self.FromType != "" {

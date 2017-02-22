@@ -37,6 +37,7 @@ const (
 	MSG_TYPE_IMG  = "img"
 )
 
+// allevent默认不处理verifyuser消息
 const (
 	DO_EVENT_ALL_EVENT    = "allevent"
 	DO_EVENT_SENDMSG      = "sendmsg"

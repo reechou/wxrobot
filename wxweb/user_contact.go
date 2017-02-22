@@ -213,7 +213,7 @@ func (self *UserContact) setIpPort(r *models.Robot) {
 func (self *UserContact) SaveRobotFriends() {
 	if self.wx.argv.IfSaveRobot {
 		robot := &models.Robot{
-			RobotWx: self.wx.MyNickName,
+			RobotWx: self.wx.Session.MyNickName,
 		}
 		has, err := models.GetRobot(robot)
 		if err != nil {
@@ -222,7 +222,7 @@ func (self *UserContact) SaveRobotFriends() {
 		}
 		if has {
 			if robot.IfSaveFriend != 0 {
-				logrus.Debugf("Robot[%s] has saved.", self.wx.MyNickName)
+				logrus.Debugf("Robot[%s] has saved.", self.wx.Session.MyNickName)
 				self.setIpPort(robot)
 				err = models.UpdateRobotSave(robot)
 				if err != nil {
@@ -249,13 +249,13 @@ func (self *UserContact) SaveRobotFriends() {
 			}
 			list = append(list, *v)
 			if len(list) >= 20 {
-				self.wx.wxh.RobotAddFriends(self.wx.MyNickName, list)
+				self.wx.wxh.RobotAddFriends(self.wx.Session.MyNickName, list)
 				list = nil
 				time.Sleep(time.Second)
 			}
 		}
 		if list != nil {
-			self.wx.wxh.RobotAddFriends(self.wx.MyNickName, list)
+			self.wx.wxh.RobotAddFriends(self.wx.Session.MyNickName, list)
 			list = nil
 		}
 		robot.IfSaveFriend = 1
@@ -269,7 +269,7 @@ func (self *UserContact) SaveRobotFriends() {
 
 func (self *UserContact) ClearWx() {
 	if self.wx.argv.IfClearWx {
-		logrus.Debugf("clear wx[%s] start.", self.wx.MyNickName)
+		logrus.Debugf("clear wx[%s] start.", self.wx.Session.MyNickName)
 		for _, v := range self.Friends {
 			_, ok := self.wx.SpecialUsers[v.UserName]
 			if ok {
@@ -281,7 +281,7 @@ func (self *UserContact) ClearWx() {
 			self.wx.Webwxsendmsg(self.wx.argv.ClearWxMsg, v.UserName)
 			time.Sleep(3 * time.Second)
 		}
-		logrus.Debugf("clear wx[%s] end.", self.wx.MyNickName)
+		logrus.Debugf("clear wx[%s] end.", self.wx.Session.MyNickName)
 	}
 }
 
@@ -300,7 +300,7 @@ func (self *UserContact) InviteMembersPic() {
 			time.Sleep(time.Duration(r.Intn(17)+11) * time.Second)
 		}
 		self.IfInviteMemberSuccess = true
-		logrus.Infof("[%s] invite members success.", self.wx.MyNickName)
+		logrus.Infof("[%s] invite members success.", self.wx.Session.MyNickName)
 	}
 }
 
@@ -347,7 +347,7 @@ func (self *UserContact) InviteMembers() {
 							dataMap := dataJson.(map[string]interface{})
 							retCode := dataMap["BaseResponse"].(map[string]interface{})["Ret"].(int)
 							if retCode == -34 {
-								logrus.Errorf("wx[%s] invite member get -34 error, maybe sleep some minute", self.wx.MyNickName)
+								logrus.Errorf("wx[%s] invite member get -34 error, maybe sleep some minute", self.wx.Session.MyNickName)
 								time.Sleep(17 * time.Minute)
 							} else {
 								for _, v2 := range memberList {
@@ -381,7 +381,7 @@ func (self *UserContact) InviteMembers() {
 			logrus.Errorf("check group not found.")
 		}
 		self.IfInviteMemberSuccess = true
-		logrus.Infof("[%s] invite members success.", self.wx.MyNickName)
+		logrus.Infof("[%s] invite members success.", self.wx.Session.MyNickName)
 	}
 	if self.wx.argv.IfInviteEndExit {
 		self.wx.Stop()
@@ -393,14 +393,12 @@ func (self *UserContact) PrintGroupInfo() {
 	cfNum := 0
 	members := make(map[string]int)
 	for _, v := range self.Groups {
-		if !strings.Contains(v.NickName, "运营") {
-			continue
-		}
+		logrus.Debugf("[*] 群: %s", v.NickName)
 		allGroupNum++
 		for _, v2 := range v.MemberList {
 			// check verify user
-			self.wx.Webwxverifyuser(WX_VERIFY_USER_OP_ADD, "你好", "", v2.UserName)
-			time.Sleep(10 * time.Second)
+			//self.wx.Webwxverifyuser(WX_VERIFY_USER_OP_ADD, "你好", "", v2.UserName)
+			//time.Sleep(10 * time.Second)
 
 			_, ok := members[v2.UserName]
 			if ok {
@@ -410,8 +408,9 @@ func (self *UserContact) PrintGroupInfo() {
 			members[v2.UserName] = 1
 		}
 	}
-	//logrus.Info("[*] REAL-群组数:", allGroupNum)
-	//logrus.Info("[*] REAL-去重群成员总数:", len(members), cfNum)
+	logrus.Info("[*] 群组数:", allGroupNum)
+	logrus.Info("[*] 好友数:", len(self.Friends))
+	//logrus.Info("[*] 去重群成员总数:", len(members), cfNum)
 }
 
 func GetHostName() string {

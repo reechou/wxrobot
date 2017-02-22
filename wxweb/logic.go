@@ -84,11 +84,22 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					sex := modContact["Sex"].(int)
 					user := self.Contact.Friends[userName]
 					if user == nil {
+						//realName := userNickName
+						//_, ok := self.Contact.NickFriends[realName]
+						//if ok {
+						//	realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
+						//	self.WebwxOplog(userName, realName)
+						//}
+						
 						realName := userNickName
-						_, ok := self.Contact.NickFriends[realName]
-						if ok {
-							realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
-							self.WebwxOplog(userName, realName)
+						realNickName := fmt.Sprintf("%s_$_%s_$_%s", userNickName, self.Session.MyNickName, time.Now().Format("20060102_15:04"))
+						res, ok := self.WebwxOplog(userName, realNickName)
+						if !ok {
+							logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
+						} else {
+							if CheckWebwxRetcode(res) {
+								realName = realNickName
+							}
 						}
 
 						uf := &UserFriend{
@@ -105,9 +116,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						self.Contact.NickFriends[realName] = uf
 
 						receiveMsg := &ReceiveMsgInfo{}
-						receiveMsg.BaseInfo.Uin = self.uin
-						receiveMsg.BaseInfo.UserName = self.MyUserName
-						receiveMsg.BaseInfo.WechatNick = self.MyNickName
+						receiveMsg.BaseInfo.Uin = self.Session.Uin
+						receiveMsg.BaseInfo.UserName = self.Session.MyUserName
+						receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
 						receiveMsg.BaseInfo.FromNickName = realName
 						receiveMsg.BaseInfo.FromUserName = userName
 						receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD
@@ -146,9 +157,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		content = strings.Replace(content, " ", " ", 1)
 		msgid := msg["MsgId"].(string)
 		receiveMsg := &ReceiveMsgInfo{}
-		receiveMsg.BaseInfo.Uin = self.uin
-		receiveMsg.BaseInfo.UserName = self.MyUserName
-		receiveMsg.BaseInfo.WechatNick = self.MyNickName
+		receiveMsg.BaseInfo.Uin = self.Session.Uin
+		receiveMsg.BaseInfo.UserName = self.Session.MyUserName
+		receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
 		receiveMsg.BaseInfo.FromUserName = fromUserName
 		// 文本消息
 		if msgType == MSG_TYPE_TEXT || msgType == MSG_TYPE_IMG || msgType == MSG_TYPE_VOICE || msgType == MSG_TYPE_VIDEO {
@@ -185,8 +196,8 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.BaseInfo.FromNickName = sendPeople.NickName
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
 			} else {
-				if receiveMsg.BaseInfo.FromUserName == self.MyUserName {
-					receiveMsg.BaseInfo.FromNickName = self.MyNickName
+				if receiveMsg.BaseInfo.FromUserName == self.Session.MyUserName {
+					receiveMsg.BaseInfo.FromNickName = self.Session.MyNickName
 					toUserName := msg["ToUserName"].(string)
 					receiveMsg.BaseToUserInfo.ToUserName = toUserName
 					uf, ok := self.Contact.Friends[toUserName]
@@ -210,7 +221,20 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.MediaTempUrl = self.msgUrlMap[msgType](msgid)
 			}
 		} else if msgType == MSG_TYPE_INIT {
-			//logrus.Debug("[*] 成功截获微信初始化消息")
+			//logrus.Debug("[*] 成功截获微信初始化消息", msg)
+			statusNotifyCode := msg["StatusNotifyCode"]
+			if statusNotifyCode == nil {
+				continue
+			}
+			if statusNotifyCode.(int) != 4 {
+				continue
+			}
+			statusNotifyUserName := msg["StatusNotifyUserName"]
+			if statusNotifyUserName == nil {
+				continue
+			}
+			statusNotifyUserNameStr := statusNotifyUserName.(string)
+			self.getBigContactList(strings.Split(statusNotifyUserNameStr, ","))
 		} else if msgType == MSG_TYPE_SYSTEM {
 			logrus.Debugf("系统消息: %s", content)
 			//if strings.Contains(content, "邀请") {
@@ -220,7 +244,27 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			//	}
 			//	//group.AppendInviteMsg(&MsgInfo{WXMsgId: msgid, Content: content})
 			//}
-
+			
+			// 系统消息,群: 扫描, 邀请
+			if strings.Contains(content, WX_SYSTEM_MSG_INVITE) || strings.Contains(content, WX_SYSTEM_MSG_SCAN) {
+				group := self.Contact.Groups[fromUserName]
+				if group == nil {
+					continue
+				}
+				receiveMsg := &ReceiveMsgInfo{}
+				receiveMsg.BaseInfo.Uin = self.Session.Uin
+				receiveMsg.BaseInfo.UserName = self.Session.MyUserName
+				receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
+				receiveMsg.BaseInfo.FromGroupName = group.NickName
+				receiveMsg.BaseInfo.FromUserName = fromUserName
+				receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MOD_GROUP_ADD
+				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
+				receiveMsg.GroupMemberNum = len(group.MemberList)
+				if receiveMsg.BaseInfo.ReceiveEvent != "" {
+					self.wxh.ReceiveMsg(receiveMsg)
+				}
+			}
+			
 			// 系统消息不是好友
 			if strings.Contains(content, WX_SYSTEM_NOT_FRIEND) {
 				if self.argv.IfClearWx {
@@ -252,7 +296,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			userName := rInfo["UserName"].(string)
 			nickName := rInfo["NickName"].(string)
 
-			logrus.Debugf("addfriend conteng: %s", content)
+			logrus.Debugf("addfriend content: %s", content)
 			//var addFriendContent AddFriendContent
 			//err := xml.Unmarshal([]byte(content), &addFriendContent)
 			//if err != nil {
@@ -300,11 +344,20 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			sexInt, _ := strconv.Atoi(sex)
 
 			realName := nickName
-			_, ok := self.Contact.NickFriends[realName]
-			if ok {
-				realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
-				self.WebwxOplog(userName, realName)
-			}
+			//_, ok := self.Contact.NickFriends[realName]
+			//if ok {
+			//	realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
+			//	self.WebwxOplog(userName, realName)
+			//}
+			//realNickName := fmt.Sprintf("%s_$_%s_$_%s", nickName, self.Session.MyNickName, time.Now().Format("20060102_15:04"))
+			//res, ok := self.WebwxOplog(userName, realNickName)
+			//if !ok {
+			//	logrus.Errorf("nick[%s] webwxoplog realname[%s] error", nickName, realNickName)
+			//} else {
+			//	if CheckWebwxRetcode(res) {
+			//		realName = realNickName
+			//	}
+			//}
 
 			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD_FRIEND
 			receiveMsg.BaseInfo.FromNickName = realName
@@ -346,13 +399,83 @@ func (self *WxWeb) handleMsg(r interface{}) {
 }
 
 func (self *WxWeb) getMsgImgUrl(msgId string) string {
-	return fmt.Sprintf("%s/webwxgetmsgimg?MsgID=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
+	return fmt.Sprintf("%s/webwxgetmsgimg?MsgID=%s&skey=%s", self.Session.BaseUri, msgId, url.QueryEscape(self.Session.SKey))
 }
 
 func (self *WxWeb) getMsgVoiceUrl(msgId string) string {
-	return fmt.Sprintf("%s/webwxgetvoice?msgid=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
+	return fmt.Sprintf("%s/webwxgetvoice?msgid=%s&skey=%s", self.Session.BaseUri, msgId, url.QueryEscape(self.Session.SKey))
 }
 
 func (self *WxWeb) getMsgVideoUrl(msgId string) string {
-	return fmt.Sprintf("%s/webwxgetvideo?msgid=%s&skey=%s", self.baseUri, msgId, url.QueryEscape(self.skey))
+	return fmt.Sprintf("%s/webwxgetvideo?msgid=%s&skey=%s", self.Session.BaseUri, msgId, url.QueryEscape(self.Session.SKey))
+}
+
+func (self *WxWeb) getBigContactList(usernameList []string) {
+	logrus.Debugf("get big contact list len: %d", len(usernameList))
+	var needGetList []string
+	for _, v := range usernameList {
+		if strings.HasPrefix(v, GROUP_PREFIX) {
+			_, ok := self.Contact.Groups[v]
+			if !ok {
+				needGetList = append(needGetList, v)
+				if len(needGetList) >= 50 {
+					logrus.Debugf("big batch get contact len: %d", len(needGetList))
+					ok = self.webwxbatchgetcontact(needGetList)
+					if !ok {
+						logrus.Errorf("webwxbatchgetcontact get error for [%v].", needGetList)
+					}
+					needGetList = nil
+				}
+			}
+		} else {
+			_, ok := self.Contact.Friends[v]
+			if !ok {
+				needGetList = append(needGetList, v)
+				if len(needGetList) >= 50 {
+					ok = self.webwxbatchgetcontact(needGetList)
+					if !ok {
+						logrus.Errorf("webwxbatchgetcontact get error for [%v].", needGetList)
+					}
+					needGetList = nil
+				}
+			}
+		}
+	}
+	if needGetList != nil {
+		logrus.Debugf("big batch get contact len: %d", len(needGetList))
+		ok := self.webwxbatchgetcontact(needGetList)
+		if !ok {
+			logrus.Errorf("webwxbatchgetcontact get error for [%v].", needGetList)
+		}
+		needGetList = nil
+	}
+	self.Contact.PrintGroupInfo()
+}
+
+func CheckWebwxRetcode(res string) bool {
+	dataRes := JsonDecode(res)
+	if dataRes == nil {
+		return false
+	}
+	data := dataRes.(map[string]interface{})
+	if data == nil {
+		return false
+	}
+	baseResponse := data["BaseResponse"]
+	if baseResponse == nil {
+		return false
+	}
+	baseResponseMap := baseResponse.(map[string]interface{})
+	if baseResponseMap == nil {
+		return false
+	}
+	ret := baseResponseMap["Ret"]
+	if ret == nil {
+		return false
+	}
+	retCode := ret.(int)
+	if retCode == WX_RET_SUCCESS {
+		return true
+	}
+	return false
 }

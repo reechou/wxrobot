@@ -38,7 +38,7 @@ func NewWxLogic(cfg *config.Config) *WxLogic {
 		done: make(chan struct{}),
 	}
 	l.wxSrv = NewWxHTTPServer(cfg, l)
-	l.wxMgr = NewWxManager()
+	l.wxMgr = NewWxManager(cfg)
 	l.eventMgr = NewEventManager(l.wxMgr, cfg)
 	l.raExt = ext.NewRobotAccount(cfg)
 
