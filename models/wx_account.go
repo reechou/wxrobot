@@ -14,6 +14,8 @@ type Robot struct {
 	Ip            string `xorm:"not null default '' varchar(64)"`
 	OfPort        string `xorm:"not null default '' varchar(64)"`
 	LastLoginTime int64  `xorm:"not null default 0 int"`
+	BaseLoginInfo string `xorm:"not null default '' varchar(768)"`
+	WebwxCookie   string `xorm:"not null default '' varchar(768)"`
 	CreatedAt     int64  `xorm:"not null default 0 int"`
 	UpdatedAt     int64  `xorm:"not null default 0 int"`
 }
@@ -55,5 +57,12 @@ func UpdateRobotSave(info *Robot) error {
 	info.LastLoginTime = now
 	info.UpdatedAt = now
 	_, err := x.Cols("if_save_friend", "ip", "of_port", "last_login_time", "updated_at").Update(info, &Robot{RobotWx: info.RobotWx})
+	return err
+}
+
+func UpdateRobotSession(info *Robot) error {
+	now := time.Now().Unix()
+	info.UpdatedAt = now
+	_, err := x.Cols("base_login_info", "webwx_cookie", "updated_at").Update(info, &Robot{RobotWx: info.RobotWx})
 	return err
 }

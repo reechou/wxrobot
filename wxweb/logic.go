@@ -42,18 +42,27 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				}
 				userName := modContact["UserName"].(string)
 				if strings.HasPrefix(userName, GROUP_PREFIX) {
-					// 群成员变化
+					// 群或者群成员变化
 					groupContactFlag := modContact["ContactFlag"].(int)
 					groupNickName := modContact["NickName"].(string)
+					groupNickName = replaceEmoji(groupNickName)
 					group := self.Contact.Groups[userName]
 					if group == nil {
 						group = NewUserGroup(groupContactFlag, groupNickName, userName, self)
 					} else {
 						group.ContactFlag = groupContactFlag
-						group.NickName = groupNickName
+						if group.NickName != groupNickName {
+							if self.argv.IfNotChangeGroupName {
+								// 不准修改群名
+								self.WebwxupdatechatroomModTopic(userName, group.NickName)
+							} else {
+								group.NickName = groupNickName
+							}
+						}
 					}
 					memberList := modContact["MemberList"].([]interface{})
 					memberListMap := make(map[string]*GroupUserInfo)
+					nickMemberListMap := make(map[string]*GroupUserInfo)
 					for _, v2 := range memberList {
 						member := v2.(map[string]interface{})
 						if member == nil {
@@ -62,6 +71,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						}
 						displayName := member["DisplayName"].(string)
 						nickName := member["NickName"].(string)
+						nickName = replaceEmoji(nickName)
 						userName := member["UserName"].(string)
 						gui := &GroupUserInfo{
 							DisplayName: displayName,
@@ -69,16 +79,27 @@ func (self *WxWeb) handleMsg(r interface{}) {
 							UserName:    userName,
 						}
 						memberListMap[userName] = gui
+						nickMemberListMap[nickName] = gui
 					}
 					group.MemberList = memberListMap
+					group.NickMemberList = nickMemberListMap
 					self.Contact.Groups[userName] = group
 					self.Contact.NickGroups[groupNickName] = group
+					
+					// test
+					//if groupNickName == "xxxx" {
+					//	logrus.Debugf("mod group - xxxx: %v", group)
+					//	for _, v := range group.MemberList {
+					//		logrus.Debugf("\tmod group - member: %v", v)
+					//	}
+					//}
 				} else {
 					// 新好友
 					//logrus.Debugf("new friend: %v", modContact)
 					userContactFlag := modContact["ContactFlag"].(int)
 					userVerifyFlag := modContact["VerifyFlag"].(int)
 					userNickName := modContact["NickName"].(string)
+					userNickName = replaceEmoji(userNickName)
 					alias := modContact["Alias"].(string)
 					city := modContact["City"].(string)
 					sex := modContact["Sex"].(int)
@@ -155,6 +176,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		content = strings.Replace(content, "&lt;", "<", -1)
 		content = strings.Replace(content, "&gt;", ">", -1)
 		content = strings.Replace(content, " ", " ", 1)
+		content = replaceEmoji(content)
 		msgid := msg["MsgId"].(string)
 		receiveMsg := &ReceiveMsgInfo{}
 		receiveMsg.BaseInfo.Uin = self.Session.Uin
@@ -296,7 +318,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			userName := rInfo["UserName"].(string)
 			nickName := rInfo["NickName"].(string)
 
-			logrus.Debugf("addfriend content: %s", content)
+			//logrus.Debugf("addfriend content: %s", content)
 			//var addFriendContent AddFriendContent
 			//err := xml.Unmarshal([]byte(content), &addFriendContent)
 			//if err != nil {
@@ -343,6 +365,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			sex = strings.Replace(sex, "sex=", "", -1)
 			sexInt, _ := strconv.Atoi(sex)
 
+			nickName = replaceEmoji(nickName)
+			sourcenickname = replaceEmoji(sourcenickname)
+			
 			realName := nickName
 			//_, ok := self.Contact.NickFriends[realName]
 			//if ok {
@@ -392,6 +417,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			self.Contact.Friends[userName] = uf
 			self.Contact.NickFriends[realName] = uf
 		}
+		//logrus.Debugf("receiveMsg: %v", receiveMsg)
 		if receiveMsg.BaseInfo.ReceiveEvent != "" {
 			self.wxh.ReceiveMsg(receiveMsg)
 		}
@@ -452,30 +478,74 @@ func (self *WxWeb) getBigContactList(usernameList []string) {
 	self.Contact.PrintGroupInfo()
 }
 
-func CheckWebwxRetcode(res string) bool {
+func CheckWebwxResData(res string) (map[string]interface{}, bool) {
 	dataRes := JsonDecode(res)
 	if dataRes == nil {
-		return false
+		logrus.Errorf("check webwx ret not ok, dataRes == nil, resdata[%s]", res)
+		return nil, false
 	}
 	data := dataRes.(map[string]interface{})
 	if data == nil {
-		return false
+		logrus.Errorf("check webwx ret not ok, data == nil, resdata[%s]", res)
+		return nil, false
 	}
+	return data, true
+}
+
+func CheckWebwxRetcodeFromData(data map[string]interface{}) bool {
 	baseResponse := data["BaseResponse"]
 	if baseResponse == nil {
+		logrus.Errorf("check webwx ret not ok, baseResponse == nil, data[%v]", data)
 		return false
 	}
 	baseResponseMap := baseResponse.(map[string]interface{})
 	if baseResponseMap == nil {
+		logrus.Errorf("check webwx ret not ok, baseResponseMap == nil, data[%v]", data)
 		return false
 	}
 	ret := baseResponseMap["Ret"]
 	if ret == nil {
+		logrus.Errorf("check webwx ret not ok, ret == nil, data[%v]", data)
 		return false
 	}
 	retCode := ret.(int)
 	if retCode == WX_RET_SUCCESS {
 		return true
 	}
+	logrus.Errorf("check webwx retcode ret[%d] not ok, data[%v]", retCode, data)
+	return false
+}
+
+func CheckWebwxRetcode(res string) bool {
+	dataRes := JsonDecode(res)
+	if dataRes == nil {
+		logrus.Errorf("check webwx ret not ok, dataRes == nil, resdata[%s]", res)
+		return false
+	}
+	data := dataRes.(map[string]interface{})
+	if data == nil {
+		logrus.Errorf("check webwx ret not ok, data == nil, resdata[%s]", res)
+		return false
+	}
+	baseResponse := data["BaseResponse"]
+	if baseResponse == nil {
+		logrus.Errorf("check webwx ret not ok, baseResponse == nil, resdata[%s]", res)
+		return false
+	}
+	baseResponseMap := baseResponse.(map[string]interface{})
+	if baseResponseMap == nil {
+		logrus.Errorf("check webwx ret not ok, baseResponseMap == nil, resdata[%s]", res)
+		return false
+	}
+	ret := baseResponseMap["Ret"]
+	if ret == nil {
+		logrus.Errorf("check webwx ret not ok, ret == nil, resdata[%s]", res)
+		return false
+	}
+	retCode := ret.(int)
+	if retCode == WX_RET_SUCCESS {
+		return true
+	}
+	logrus.Errorf("check webwx retcode ret[%d] not ok, resdata[%s]", retCode, res)
 	return false
 }

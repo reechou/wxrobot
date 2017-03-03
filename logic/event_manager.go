@@ -91,6 +91,9 @@ func (self *EventManager) loadFile() {
 			logrus.Errorf("load event file[%s] error: %v", self.cfg.WxEventFile, err)
 			break
 		}
+		if strings.HasPrefix(string(line), "#") {
+			continue
+		}
 		//line = strings.Replace(line, "\n", "", -1)
 		argv := strings.Split(string(line), " ")
 		if len(argv) == 0 {

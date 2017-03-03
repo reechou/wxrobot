@@ -1,13 +1,16 @@
 package wxweb
 
 import (
+	"fmt"
 	"math/rand"
+	"net"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"os"
-	"net"
-	
+
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/models"
 )
@@ -51,10 +54,11 @@ type MsgOffset struct {
 }
 type UserGroup struct {
 	sync.Mutex
-	ContactFlag int
-	NickName    string
-	UserName    string
-	MemberList  map[string]*GroupUserInfo
+	ContactFlag    int
+	NickName       string
+	UserName       string
+	MemberList     map[string]*GroupUserInfo
+	NickMemberList map[string]*GroupUserInfo
 
 	wx *WxWeb
 
@@ -68,10 +72,11 @@ type UserGroup struct {
 
 func NewUserGroup(contactFlag int, nickName, userName string, wx *WxWeb) *UserGroup {
 	return &UserGroup{
-		ContactFlag: contactFlag,
-		NickName:    nickName,
-		UserName:    userName,
-		MemberList:  make(map[string]*GroupUserInfo),
+		ContactFlag:    contactFlag,
+		NickName:       nickName,
+		UserName:       userName,
+		MemberList:     make(map[string]*GroupUserInfo),
+		NickMemberList: make(map[string]*GroupUserInfo),
 		offset: &MsgOffset{
 			SliceStart: -1,
 			SliceEnd:   -1,
@@ -202,6 +207,34 @@ func NewUserContact(wx *WxWeb) *UserContact {
 		NickFriends: make(map[string]*UserFriend),
 		Groups:      make(map[string]*UserGroup),
 		NickGroups:  make(map[string]*UserGroup),
+	}
+}
+
+func (self *UserContact) CreateGroups() {
+	if self.wx.argv.IfCreateGroup {
+		logrus.Debugf("wx[%s] create groups start.", self.wx.Session.MyNickName)
+		var usernameList []string
+		for _, v := range self.wx.argv.CreateGroupUsers {
+			uf := self.NickFriends[v]
+			if uf == nil {
+				logrus.Errorf("create groups error, uf[%s] not found", v)
+				return
+			}
+			usernameList = append(usernameList, uf.UserName)
+		}
+		for i := 0; i < self.wx.argv.CreateGroupNum; i++ {
+			idx := self.wx.argv.CreateGroupStart + i
+			res, ok := self.wx.webwxcreatechatroom(usernameList, fmt.Sprintf("%s%d", self.wx.argv.CreateGroupPrefix, idx))
+			if !ok {
+				logrus.Errorf("create groups error")
+				return
+			}
+			if !CheckWebwxRetcode(res) {
+				logrus.Errorf("create groups error result: %s", res)
+				return
+			}
+			time.Sleep(2 * time.Second)
+		}
 	}
 }
 
@@ -388,6 +421,17 @@ func (self *UserContact) InviteMembers() {
 	}
 }
 
+func (self *UserContact) GroupMass() {
+	for _, v := range self.Groups {
+		if strings.Contains(v.NickName, "测试AASS") {
+			if v.NickName < "测试AASS1280" {
+				self.wx.Webwxsendmsg("本周给大家推荐余华的《活着》，请大家点击下方链接阅读\n\n活着（一）\nhttp://t.cn/Ric7YZ3\n\n活着（二）上\nhttp://t.cn/Ric7QQ5\n\n活着（二）下\nhttp://t.cn/Ric7nWD\n\n活着（三）\nhttp://t.cn/Ric7syt\n\n活着（四）\nhttp://t.cn/RiczPx0\n\n活着（五）上\nhttp://t.cn/RiczzNp\n\n活着（五）下\nhttp://t.cn/RiczGtz\n\n活着（六）\nhttp://t.cn/RiczcoK\n\n活着（七）\nhttp://t.cn/RiczIAH\n\n下周更新《撒哈拉的故事》，本周的大家可以收藏起来看，或者到聊天文件中找哦。", v.UserName)
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}
+}
+
 func (self *UserContact) PrintGroupInfo() {
 	allGroupNum := 0
 	cfNum := 0
@@ -407,6 +451,14 @@ func (self *UserContact) PrintGroupInfo() {
 			}
 			members[v2.UserName] = 1
 		}
+
+		// test
+		//if v.NickName == "xxxx" {
+		//	logrus.Debugf("xxxx: %v", v)
+		//	for _, v := range v.MemberList {
+		//		logrus.Debugf("\tmember: %v", v)
+		//	}
+		//}
 	}
 	logrus.Info("[*] 群组数:", allGroupNum)
 	logrus.Info("[*] 好友数:", len(self.Friends))
@@ -429,6 +481,24 @@ func GetLocalIP(hostName string) string {
 		return ""
 	}
 	return ipAddress.String()
+}
+
+func replaceEmoji(oriStr string) string {
+	newStr := oriStr
+
+	if strings.Contains(oriStr, `<span class="emoji`) {
+		reg, _ := regexp.Compile(`<span class="emoji emoji[a-f0-9]{5}"></span>`)
+		newStr = reg.ReplaceAllStringFunc(oriStr, func(arg2 string) string {
+			num := `'\U000` + arg2[len(arg2)-14:len(arg2)-9] + `'`
+			emoji, err := strconv.Unquote(num)
+			if err == nil {
+				return emoji
+			}
+			return num
+		})
+	}
+
+	return newStr
 }
 
 func init() {

@@ -110,7 +110,7 @@ func (self *EventFilter) Run() {
 	for {
 		select {
 		case msg := <-self.msgChan:
-			//logrus.Debugf("filter msg: %v", msg.msg)
+			//logrus.Debugf("filter msg: %v f: %v", msg.msg, self)
 			if self.Event != msg.msg.BaseInfo.ReceiveEvent {
 				if self.Event != DO_EVENT_ALL_EVENT {
 					continue
@@ -130,7 +130,7 @@ func (self *EventFilter) Run() {
 					continue
 				}
 			}
-			logrus.Debugf("filter[%d] msg: %v", self.eventId, msg.msg)
+			//logrus.Debugf("filter[%d] msg: %v", self.eventId, msg.msg)
 			if self.From != "" {
 				if msg.msg.BaseInfo.FromType == CHAT_TYPE_GROUP {
 					if !ExecCheckFunc(self.From, msg.msg.BaseInfo.FromGroupName) {
