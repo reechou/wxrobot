@@ -1638,7 +1638,7 @@ func (self *WxWeb) Run() {
 		go self.Contact.CreateGroups()
 	}
 	
-	go self.testUploadMedia()
+	//go self.testUploadMedia()
 	//self.Contact.PrintGroupInfo()
 	//self.Contact.GroupMass()
 
