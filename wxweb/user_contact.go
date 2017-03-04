@@ -191,6 +191,8 @@ func (self *UserGroup) GetMsgList(msgId int) []*MsgInfo {
 }
 
 type UserContact struct {
+	sync.Mutex
+	
 	wx          *WxWeb
 	Friends     map[string]*UserFriend
 	NickFriends map[string]*UserFriend
@@ -208,6 +210,34 @@ func NewUserContact(wx *WxWeb) *UserContact {
 		Groups:      make(map[string]*UserGroup),
 		NickGroups:  make(map[string]*UserGroup),
 	}
+}
+
+func (self *UserContact) GetGroup(username string) *UserGroup {
+	self.Lock()
+	defer self.Unlock()
+	
+	return self.Groups[username]
+}
+
+func (self *UserContact) SetGroup(username string, ug *UserGroup) {
+	self.Lock()
+	defer self.Unlock()
+	
+	self.Groups[username] = ug
+}
+
+func (self *UserContact) GetNickGroup(nickname string) *UserGroup {
+	self.Lock()
+	defer self.Unlock()
+	
+	return self.NickGroups[nickname]
+}
+
+func (self *UserContact) SetNickGroup(nickname string, ug *UserGroup) {
+	self.Lock()
+	defer self.Unlock()
+	
+	self.NickGroups[nickname] = ug
 }
 
 func (self *UserContact) CreateGroups() {

@@ -80,6 +80,11 @@ type WebWxSession struct {
 	MediaCount  int64
 }
 
+type WxWebMediaInfo struct {
+	MediaId  string
+	LastTime int64
+}
+
 type WxWeb struct {
 	sync.Mutex
 
@@ -102,6 +107,9 @@ type WxWeb struct {
 	argv      *StartWxArgv
 
 	lastSaveCookieTime int64
+	
+	imgMediaMutex sync.Mutex
+	imgMediaIdMap map[string]*WxWebMediaInfo
 
 	startTime int64
 	ifLogin   bool
@@ -117,6 +125,7 @@ func NewWxWeb(cfg *config.Config, wxh WxHandler) *WxWeb {
 		stopped: make(chan struct{}),
 		wxh:     wxh,
 		Session: &WebWxSession{MediaCount: -1},
+		imgMediaIdMap: make(map[string]*WxWebMediaInfo),
 	}
 	wx.initSpecialUsers()
 
@@ -130,6 +139,7 @@ func NewWxWebWithArgv(cfg *config.Config, wxh WxHandler, argv *StartWxArgv) *WxW
 		wxh:     wxh,
 		argv:    argv,
 		Session: &WebWxSession{MediaCount: -1},
+		imgMediaIdMap: make(map[string]*WxWebMediaInfo),
 	}
 	wx.initMsgUrlMap()
 	wx.initSpecialUsers()
@@ -1206,6 +1216,20 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 }
 
 func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) {
+	now := time.Now().Unix()
+	
+	self.imgMediaMutex.Lock()
+	media := self.imgMediaIdMap[filePath]
+	if media != nil {
+		if now-media.LastTime < 3600 {
+			logrus.Debugf("get filepath[%s] media from cache[%s] success.", filePath, media.MediaId)
+			mediaId := media.MediaId
+			self.imgMediaMutex.Unlock()
+			return mediaId, true
+		}
+	}
+	self.imgMediaMutex.Unlock()
+	
 	// 图片类型
 	typef := z.FileType(filePath)
 	logrus.Debugf("file type: %s", typef)
@@ -1304,7 +1328,23 @@ func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) 
 			return "", false
 		}
 		logrus.Debugf("wx[%s] upload media[%s] success, id: %v", self.Session.MyNickName, filePath, mediaId)
-		return mediaId.(string), true
+		
+		// for cache
+		mediaIdStr := mediaId.(string)
+		if media == nil {
+			media = &WxWebMediaInfo{
+				MediaId: mediaIdStr,
+				LastTime: now,
+			}
+			self.imgMediaMutex.Lock()
+			self.imgMediaIdMap[filePath] = media
+			self.imgMediaMutex.Unlock()
+		} else {
+			media.MediaId = mediaIdStr
+			media.LastTime = now
+		}
+		
+		return mediaIdStr, true
 	}
 
 	return "", false
@@ -1598,7 +1638,7 @@ func (self *WxWeb) Run() {
 		go self.Contact.CreateGroups()
 	}
 	
-	//self.testUploadMedia()
+	go self.testUploadMedia()
 	//self.Contact.PrintGroupInfo()
 	//self.Contact.GroupMass()
 
@@ -1670,6 +1710,9 @@ func (self *WxWeb) testUploadMedia() {
 	mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
 	if ok {
 		self.Webwxsendmsgimg(self.TestUserName, mediaId)
+		time.Sleep(time.Hour)
+		self.Webwxsendmsgimg(self.TestUserName, mediaId)
+		
 		self.Webwxsendmsg("xxxxx", self.TestUserName)
 	}
 }

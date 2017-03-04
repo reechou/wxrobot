@@ -46,7 +46,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					groupContactFlag := modContact["ContactFlag"].(int)
 					groupNickName := modContact["NickName"].(string)
 					groupNickName = replaceEmoji(groupNickName)
-					group := self.Contact.Groups[userName]
+					group := self.Contact.GetGroup(userName)
 					if group == nil {
 						group = NewUserGroup(groupContactFlag, groupNickName, userName, self)
 					} else {
@@ -83,8 +83,8 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					}
 					group.MemberList = memberListMap
 					group.NickMemberList = nickMemberListMap
-					self.Contact.Groups[userName] = group
-					self.Contact.NickGroups[groupNickName] = group
+					self.Contact.SetGroup(userName, group)
+					self.Contact.SetNickGroup(groupNickName, group)
 					
 					// test
 					//if groupNickName == "xxxx" {
@@ -194,7 +194,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				contentSlice := strings.Split(content, ":<br/>")
 				people := contentSlice[0]
 				content = contentSlice[1]
-				group := self.Contact.Groups[fromUserName]
+				group := self.Contact.GetGroup(fromUserName)
 				if group == nil {
 					logrus.Errorf("cannot found the group[%s]", fromUserName)
 					continue
@@ -269,7 +269,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			
 			// 系统消息,群: 扫描, 邀请
 			if strings.Contains(content, WX_SYSTEM_MSG_INVITE) || strings.Contains(content, WX_SYSTEM_MSG_SCAN) {
-				group := self.Contact.Groups[fromUserName]
+				group := self.Contact.GetGroup(fromUserName)
 				if group == nil {
 					continue
 				}
@@ -441,12 +441,12 @@ func (self *WxWeb) getBigContactList(usernameList []string) {
 	var needGetList []string
 	for _, v := range usernameList {
 		if strings.HasPrefix(v, GROUP_PREFIX) {
-			_, ok := self.Contact.Groups[v]
-			if !ok {
+			group := self.Contact.GetGroup(v)
+			if group == nil {
 				needGetList = append(needGetList, v)
 				if len(needGetList) >= 50 {
 					logrus.Debugf("big batch get contact len: %d", len(needGetList))
-					ok = self.webwxbatchgetcontact(needGetList)
+					ok := self.webwxbatchgetcontact(needGetList)
 					if !ok {
 						logrus.Errorf("webwxbatchgetcontact get error for [%v].", needGetList)
 					}

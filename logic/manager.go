@@ -95,9 +95,9 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 		var userName string
 		if msg.UserName != "" {
 			userName = msg.UserName
-			group := wx.Contact.Groups[userName]
+			group := wx.Contact.GetGroup(userName)
 			if group == nil {
-				group := wx.Contact.NickGroups[msg.Name]
+				group := wx.Contact.GetNickGroup(msg.Name)
 				if group == nil {
 					logrus.Errorf("unkown this group[%s]", msg.Name)
 					return
@@ -108,7 +108,7 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 				logrus.Debugf("send msg to group find username[%s] from request", userName)
 			}
 		} else {
-			group := wx.Contact.NickGroups[msg.Name]
+			group := wx.Contact.GetNickGroup(msg.Name)
 			if group == nil {
 				logrus.Errorf("unkown this group[%s]", msg.Name)
 				return
