@@ -1,14 +1,15 @@
 package wxweb
 
 type BaseInfo struct {
-	Uin           string `json:"uin"`
-	UserName      string `json:"userName,omitempty"`   // 机器人username
-	WechatNick    string `json:"wechatNick,omitempty"` // 微信昵称
-	ReceiveEvent  string `json:"receiveEvent,omitempty"`
-	FromType      string `json:"fromType,omitempty"`
-	FromUserName  string `json:"fromUserName,omitempty"`
-	FromNickName  string `json:"fromNickName,omitempty"`
-	FromGroupName string `json:"fromGroupName,omitempty"`
+	Uin                string `json:"uin"`
+	UserName           string `json:"userName,omitempty"`   // 机器人username
+	WechatNick         string `json:"wechatNick,omitempty"` // 微信昵称
+	ReceiveEvent       string `json:"receiveEvent,omitempty"`
+	FromType           string `json:"fromType,omitempty"`
+	FromUserName       string `json:"fromUserName,omitempty"`       // 群或者好友username
+	FromMemberUserName string `json:"fromMemberUserName,omitempty"` // 群里用户username
+	FromNickName       string `json:"fromNickName,omitempty"`       // 好友或者群里用户昵称
+	FromGroupName      string `json:"fromGroupName,omitempty"`      // 群名
 }
 
 type BaseToUserInfo struct {

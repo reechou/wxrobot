@@ -4,11 +4,11 @@ import (
 	//"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"net/url"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -33,6 +33,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 	//logrus.Debugf("msg: %v", msgSource)
 	modContactList := msgSource["ModContactList"]
 	if modContactList != nil {
+		//logrus.Debugf("modContactList: %v", modContactList)
 		contactList := modContactList.([]interface{})
 		if contactList != nil {
 			for _, v := range contactList {
@@ -45,7 +46,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					// 群或者群成员变化
 					groupContactFlag := modContact["ContactFlag"].(int)
 					groupNickName := modContact["NickName"].(string)
-					groupNickName = replaceEmoji(groupNickName)
+					if !self.argv.IfNotReplaceEmoji {
+						groupNickName = replaceEmoji(groupNickName)
+					}
 					group := self.Contact.GetGroup(userName)
 					if group == nil {
 						group = NewUserGroup(groupContactFlag, groupNickName, userName, self)
@@ -71,7 +74,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						}
 						displayName := member["DisplayName"].(string)
 						nickName := member["NickName"].(string)
-						nickName = replaceEmoji(nickName)
+						if !self.argv.IfNotReplaceEmoji {
+							nickName = replaceEmoji(nickName)
+						}
 						userName := member["UserName"].(string)
 						gui := &GroupUserInfo{
 							DisplayName: displayName,
@@ -81,11 +86,11 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						memberListMap[userName] = gui
 						nickMemberListMap[nickName] = gui
 					}
-					group.MemberList = memberListMap
-					group.NickMemberList = nickMemberListMap
+					group.ModMember(memberListMap)
+					group.SetMemberList(memberListMap, nickMemberListMap)
 					self.Contact.SetGroup(userName, group)
 					self.Contact.SetNickGroup(groupNickName, group)
-					
+
 					// test
 					//if groupNickName == "xxxx" {
 					//	logrus.Debugf("mod group - xxxx: %v", group)
@@ -99,7 +104,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					userContactFlag := modContact["ContactFlag"].(int)
 					userVerifyFlag := modContact["VerifyFlag"].(int)
 					userNickName := modContact["NickName"].(string)
-					userNickName = replaceEmoji(userNickName)
+					if !self.argv.IfNotReplaceEmoji {
+						userNickName = replaceEmoji(userNickName)
+					}
 					alias := modContact["Alias"].(string)
 					city := modContact["City"].(string)
 					sex := modContact["Sex"].(int)
@@ -111,16 +118,14 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						//	realName = fmt.Sprintf("%s_$$_%d", realName, time.Now().Unix())
 						//	self.WebwxOplog(userName, realName)
 						//}
-						
+
 						realName := userNickName
 						realNickName := fmt.Sprintf("%s_$_%s_$_%s", userNickName, self.Session.MyNickName, time.Now().Format("20060102_15:04"))
-						res, ok := self.WebwxOplog(userName, realNickName)
+						ok := self.WebwxOplog(userName, realNickName)
 						if !ok {
 							logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
 						} else {
-							if CheckWebwxRetcode(res) {
-								realName = realNickName
-							}
+							realName = realNickName
 						}
 
 						uf := &UserFriend{
@@ -176,7 +181,9 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		content = strings.Replace(content, "&lt;", "<", -1)
 		content = strings.Replace(content, "&gt;", ">", -1)
 		content = strings.Replace(content, " ", " ", 1)
-		content = replaceEmoji(content)
+		if !self.argv.IfNotReplaceEmoji {
+			content = replaceEmoji(content)
+		}
 		msgid := msg["MsgId"].(string)
 		receiveMsg := &ReceiveMsgInfo{}
 		receiveMsg.BaseInfo.Uin = self.Session.Uin
@@ -199,7 +206,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					logrus.Errorf("cannot found the group[%s]", fromUserName)
 					continue
 				}
-				sendPeople := group.MemberList[people]
+				sendPeople := group.GetMemberFromList(people)
 				if sendPeople == nil {
 					continue
 				}
@@ -214,8 +221,14 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				// 读取消息
 				//self.webwxstatusnotifyMsgRead(fromUserName)
 
+				peopleNickname := sendPeople.NickName
+				uf := self.Contact.GetFriend(people)
+				if uf != nil {
+					peopleNickname = uf.RemarkName
+				}
+
 				receiveMsg.BaseInfo.FromGroupName = group.NickName
-				receiveMsg.BaseInfo.FromNickName = sendPeople.NickName
+				receiveMsg.BaseInfo.FromNickName = peopleNickname
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
 			} else {
 				if receiveMsg.BaseInfo.FromUserName == self.Session.MyUserName {
@@ -266,7 +279,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			//	}
 			//	//group.AppendInviteMsg(&MsgInfo{WXMsgId: msgid, Content: content})
 			//}
-			
+
 			// 系统消息,群: 扫描, 邀请
 			if strings.Contains(content, WX_SYSTEM_MSG_INVITE) || strings.Contains(content, WX_SYSTEM_MSG_SCAN) {
 				group := self.Contact.GetGroup(fromUserName)
@@ -281,12 +294,12 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.BaseInfo.FromUserName = fromUserName
 				receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MOD_GROUP_ADD
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
-				receiveMsg.GroupMemberNum = len(group.MemberList)
+				receiveMsg.GroupMemberNum = group.GetGroupMemberLen()
 				if receiveMsg.BaseInfo.ReceiveEvent != "" {
 					self.wxh.ReceiveMsg(receiveMsg)
 				}
 			}
-			
+
 			// 系统消息不是好友
 			if strings.Contains(content, WX_SYSTEM_NOT_FRIEND) {
 				if self.argv.IfClearWx {
@@ -365,9 +378,11 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			sex = strings.Replace(sex, "sex=", "", -1)
 			sexInt, _ := strconv.Atoi(sex)
 
-			nickName = replaceEmoji(nickName)
-			sourcenickname = replaceEmoji(sourcenickname)
-			
+			if !self.argv.IfNotReplaceEmoji {
+				nickName = replaceEmoji(nickName)
+				sourcenickname = replaceEmoji(sourcenickname)
+			}
+
 			realName := nickName
 			//_, ok := self.Contact.NickFriends[realName]
 			//if ok {

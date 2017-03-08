@@ -113,6 +113,29 @@ func (self *WxLogic) WxSendMsgInfo(msg *wxweb.SendMsgInfo) {
 	}
 }
 
+func (self *WxLogic) RobotFindFriend(info *RobotFindFriendReq) *wxweb.UserFriend {
+	return self.wxMgr.FindFriend(info)
+}
+
+func (self *WxLogic) RobotRemarkFriend(info *RobotRemarkFriendReq) bool {
+	ok := self.wxMgr.RemarkFriend(info)
+	if ok {
+		logrus.Debugf("wx remark frined[%v] success.", info)
+	} else {
+		logrus.Errorf("wx remark frined[%v] error.", info)
+	}
+	return ok
+}
+
+func (self *WxLogic) RobotGroupTiren(info *RobotGroupTirenReq) (*wxweb.GroupUserInfo, bool) {
+	return self.wxMgr.GroupTiren(info)
+}
+
+func (self *WxLogic) GetAllRobots() []RobotInfo {
+	return self.wxMgr.LoginRobots()
+}
+
+// for logic wx interface
 func (self *WxLogic) Login(uuid string) {
 	logrus.Infof("uuid[%s] login success.", uuid)
 	wx, ok := self.wxs[uuid]
@@ -145,6 +168,14 @@ func (self *WxLogic) RobotAddFriends(robot string, friends []wxweb.UserFriend) {
 		Friends: friends,
 	}
 	self.raExt.RobotAddFriends(req)
+}
+
+func (self *WxLogic) RobotAddGroups(robot string, groups []wxweb.WxGroup) {
+	req := &ext.RobotSaveGroupsReq{
+		RobotWx: robot,
+		Groups:  groups,
+	}
+	self.raExt.RobotAddGroups(req)
 }
 
 func (self *WxLogic) runCheck() {

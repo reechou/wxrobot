@@ -23,6 +23,12 @@ var (
 	HostIP string
 )
 
+type WxGroup struct {
+	NickName       string `json:"nickname"`
+	UserName       string `json:"username"`
+	GroupMemberNum int    `json:"groupMemberNum"`
+}
+
 type UserFriend struct {
 	Alias       string `json:"alias"`
 	City        string `json:"city"`
@@ -35,9 +41,9 @@ type UserFriend struct {
 }
 
 type GroupUserInfo struct {
-	DisplayName string
-	NickName    string
-	UserName    string
+	DisplayName string `json:"displayName"`
+	NickName    string `json:"nickname"`
+	UserName    string `json:"username"`
 }
 type MsgInfo struct {
 	MsgID    int
@@ -54,9 +60,11 @@ type MsgOffset struct {
 }
 type UserGroup struct {
 	sync.Mutex
-	ContactFlag    int
-	NickName       string
-	UserName       string
+	ContactFlag int
+	NickName    string
+	UserName    string
+
+	memberMutex    sync.Mutex
 	MemberList     map[string]*GroupUserInfo
 	NickMemberList map[string]*GroupUserInfo
 
@@ -88,57 +96,84 @@ func NewUserGroup(contactFlag int, nickName, userName string, wx *WxWeb) *UserGr
 	}
 }
 
-func (self *UserGroup) AppendInviteMsg(msg *MsgInfo) {
-	//if self.NickName == "" {
-	//	logrus.Errorf("this group has no nick name.")
-	//	return
-	//}
-	//invite := strings.Replace(msg.Content, "\"", "", -1)
-	//invite = strings.Replace(invite, "邀请", ",", -1)
-	//invite = strings.Replace(invite, "加入了群聊", "", -1)
-	//users := strings.Split(invite, ",")
-	//if len(users) != 2 {
-	//	logrus.Errorf("parse invite content[%s] error.", msg.Content)
-	//	return
-	//}
-	//inviteUsers := strings.Split(users[1], "、")
-	//for _, v := range inviteUsers {
-	//	has, err := self.rankRedis.HSetNX("invite_"+self.NickName, v, true)
-	//	//has, err := self.rankRedis.HSetNX("invite_wx_rank", v, true)
-	//	if err != nil {
-	//		logrus.Errorf("hsetnx invite[%s] error: %v", v, err)
-	//		continue
-	//	}
-	//	if !has {
-	//		logrus.Debugf("has invited[%s] this man.", v)
-	//		continue
-	//	}
-	//	//self.rankRedis.ZIncrby(self.NickName, 1, users[0])
-	//	self.rankRedis.ZIncrby("wx_rank", 1, users[0])
-	//}
+func (self *UserGroup) ModMember(memberList map[string]*GroupUserInfo) {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	//logrus.Debugf("old member: %v", self.MemberList)
+	//logrus.Debugf("mod member: %v", memberList)
+	for k, v := range memberList {
+		_, ok := self.MemberList[k]
+		if !ok {
+			receiveMsg := &ReceiveMsgInfo{}
+			receiveMsg.BaseInfo.Uin = self.wx.Session.Uin
+			receiveMsg.BaseInfo.UserName = self.wx.Session.MyUserName
+			receiveMsg.BaseInfo.WechatNick = self.wx.Session.MyNickName
+			receiveMsg.BaseInfo.FromGroupName = self.NickName
+			receiveMsg.BaseInfo.FromNickName = v.NickName
+			receiveMsg.BaseInfo.FromUserName = self.UserName
+			receiveMsg.BaseInfo.FromMemberUserName = v.UserName
+			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MOD_GROUP_ADD_DETAIL
+			receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
+			receiveMsg.GroupMemberNum = len(memberList)
+			self.wx.wxh.ReceiveMsg(receiveMsg)
+		}
+	}
 }
 
-func (self *UserGroup) GetInviteRank() string {
-	//list := self.rankRedis.ZRevrange(self.NickName, 0, 10)
-	//list := self.rankRedis.ZRevrange("wx_rank", 0, 10)
-	//var usersRankInfo string
-	//var userRank string
-	//usersRankInfo += "邀请排行榜:\n"
-	//for i := 0; i < len(list); i++ {
-	//	//if i % 2 == 0 {
-	//	//	userRank += "@"
-	//	//}
-	//	userRank += string(list[i].([]byte))
-	//	if i%2 == 0 {
-	//		userRank += ": "
-	//	} else {
-	//		userRank += "人\n"
-	//		usersRankInfo += userRank
-	//		userRank = ""
-	//	}
-	//}
-	//return usersRankInfo
-	return ""
+func (self *UserGroup) DelMember(username string) {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	gui := self.MemberList[username]
+	if gui != nil {
+		logrus.Debugf("usergroup[%s] del member[%s][%s]", self.NickName, username, gui.NickName)
+		delete(self.NickMemberList, gui.NickName)
+		delete(self.MemberList, username)
+	}
+}
+
+func (self *UserGroup) FindMember(username, nickname string) *GroupUserInfo {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	if username != "" {
+		gui := self.MemberList[username]
+		if gui != nil {
+			return gui
+		}
+	}
+
+	return self.NickMemberList[nickname]
+}
+
+func (self *UserGroup) SetMemberList(memberList, nickMemberList map[string]*GroupUserInfo) {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	self.MemberList = memberList
+	self.NickMemberList = nickMemberList
+}
+
+func (self *UserGroup) GetMemberFromList(username string) *GroupUserInfo {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	return self.MemberList[username]
+}
+
+func (self *UserGroup) GetMemberFromNickList(nickname string) *GroupUserInfo {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	return self.MemberList[nickname]
+}
+
+func (self *UserGroup) GetGroupMemberLen() int {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	return len(self.MemberList)
 }
 
 func (self *UserGroup) AppendMsg(msg *MsgInfo) {
@@ -191,8 +226,9 @@ func (self *UserGroup) GetMsgList(msgId int) []*MsgInfo {
 }
 
 type UserContact struct {
-	sync.Mutex
-	
+	groupMutex  sync.Mutex
+	friendMutex sync.Mutex
+
 	wx          *WxWeb
 	Friends     map[string]*UserFriend
 	NickFriends map[string]*UserFriend
@@ -212,32 +248,118 @@ func NewUserContact(wx *WxWeb) *UserContact {
 	}
 }
 
+func (self *UserContact) ChangeFriend(username, remark string) {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	uf := self.Friends[username]
+	if uf == nil {
+		logrus.Errorf("change friend not found [%s]", username)
+		return
+	}
+	nuf := self.NickFriends[uf.RemarkName]
+	if nuf != nil {
+		delete(self.NickFriends, uf.RemarkName)
+		logrus.Debugf("wx[%s] delete nick friend: %s", self.wx.Session.MyNickName, uf.RemarkName)
+	}
+	uf.RemarkName = remark
+
+	self.NickFriends[remark] = uf
+	logrus.Debugf("wx[%s] add nick friend: %v", self.wx.Session.MyNickName, uf)
+}
+
+func (self *UserContact) FindGroup(username, nickname string) *UserGroup {
+	self.groupMutex.Lock()
+	defer self.groupMutex.Unlock()
+
+	if username != "" {
+		group := self.Groups[username]
+		if group != nil {
+			return group
+		}
+	}
+
+	return self.NickGroups[nickname]
+}
+
+func (self *UserContact) FindGroupUser(groupUsername, groupNickname, memberUsername, memberNickname string) (*UserGroup, *GroupUserInfo) {
+	ug := self.FindGroup(groupUsername, groupNickname)
+	if ug != nil {
+		//logrus.Debugf("ug: %v", ug.NickMemberList)
+		return ug, ug.FindMember(memberUsername, memberNickname)
+	}
+
+	return nil, nil
+}
+
 func (self *UserContact) GetGroup(username string) *UserGroup {
-	self.Lock()
-	defer self.Unlock()
-	
+	self.groupMutex.Lock()
+	defer self.groupMutex.Unlock()
+
 	return self.Groups[username]
 }
 
 func (self *UserContact) SetGroup(username string, ug *UserGroup) {
-	self.Lock()
-	defer self.Unlock()
-	
+	self.groupMutex.Lock()
+	defer self.groupMutex.Unlock()
+
 	self.Groups[username] = ug
 }
 
 func (self *UserContact) GetNickGroup(nickname string) *UserGroup {
-	self.Lock()
-	defer self.Unlock()
-	
+	self.groupMutex.Lock()
+	defer self.groupMutex.Unlock()
+
 	return self.NickGroups[nickname]
 }
 
 func (self *UserContact) SetNickGroup(nickname string, ug *UserGroup) {
-	self.Lock()
-	defer self.Unlock()
-	
+	self.groupMutex.Lock()
+	defer self.groupMutex.Unlock()
+
 	self.NickGroups[nickname] = ug
+}
+
+func (self *UserContact) FindFriend(username, nickname string) *UserFriend {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	if username != "" {
+		uf := self.Friends[username]
+		if uf != nil {
+			return uf
+		}
+	}
+
+	return self.NickFriends[nickname]
+}
+
+func (self *UserContact) GetFriend(username string) *UserFriend {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	return self.Friends[username]
+}
+
+func (self *UserContact) SetFriend(username string, uf *UserFriend) {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	self.Friends[username] = uf
+}
+
+func (self *UserContact) GetNickFriend(nickname string) *UserFriend {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	return self.NickFriends[nickname]
+}
+
+func (self *UserContact) SetNickFriend(nickname string, uf *UserFriend) {
+	self.friendMutex.Lock()
+	defer self.friendMutex.Unlock()
+
+	self.NickFriends[nickname] = uf
 }
 
 func (self *UserContact) CreateGroups() {
@@ -273,8 +395,62 @@ func (self *UserContact) setIpPort(r *models.Robot) {
 	r.OfPort = self.wx.cfg.Host
 }
 
+func (self *UserContact) SaveRobotGroups() {
+	if self.wx.argv.IfSaveRobotGroups {
+		robot := &models.Robot{
+			RobotWx: self.wx.Session.MyNickName,
+		}
+		has, err := models.GetRobot(robot)
+		if err != nil {
+			logrus.Errorf("get robot error: %v", err)
+			return
+		}
+		if has {
+			if robot.IfSaveGroup != 0 {
+				logrus.Debugf("Robot[%s] group has saved.", self.wx.Session.MyNickName)
+				self.setIpPort(robot)
+				err = models.UpdateRobotSaveGroup(robot)
+				if err != nil {
+					logrus.Errorf("update robot save group error: %v", err)
+				}
+				return
+			}
+		} else {
+			self.setIpPort(robot)
+			err = models.CreateRobot(robot)
+			if err != nil {
+				logrus.Errorf("create robot error: %v", err)
+				return
+			}
+		}
+		var list []WxGroup
+		for _, v := range self.Groups {
+			list = append(list, WxGroup{
+				NickName:       v.NickName,
+				UserName:       v.UserName,
+				GroupMemberNum: v.GetGroupMemberLen(),
+			})
+			if len(list) >= 20 {
+				self.wx.wxh.RobotAddGroups(self.wx.Session.MyNickName, list)
+				list = nil
+				time.Sleep(time.Second)
+			}
+		}
+		if list != nil {
+			self.wx.wxh.RobotAddGroups(self.wx.Session.MyNickName, list)
+			list = nil
+		}
+		robot.IfSaveGroup = 1
+		self.setIpPort(robot)
+		err = models.UpdateRobotSaveGroup(robot)
+		if err != nil {
+			logrus.Errorf("update robot save group error: %v", err)
+		}
+	}
+}
+
 func (self *UserContact) SaveRobotFriends() {
-	if self.wx.argv.IfSaveRobot {
+	if self.wx.argv.IfSaveRobotFriends {
 		robot := &models.Robot{
 			RobotWx: self.wx.Session.MyNickName,
 		}
@@ -285,9 +461,9 @@ func (self *UserContact) SaveRobotFriends() {
 		}
 		if has {
 			if robot.IfSaveFriend != 0 {
-				logrus.Debugf("Robot[%s] has saved.", self.wx.Session.MyNickName)
+				logrus.Debugf("Robot[%s] friend has saved.", self.wx.Session.MyNickName)
 				self.setIpPort(robot)
-				err = models.UpdateRobotSave(robot)
+				err = models.UpdateRobotSaveFriend(robot)
 				if err != nil {
 					logrus.Errorf("update robot save error: %v", err)
 				}
@@ -323,9 +499,9 @@ func (self *UserContact) SaveRobotFriends() {
 		}
 		robot.IfSaveFriend = 1
 		self.setIpPort(robot)
-		err = models.UpdateRobotSave(robot)
+		err = models.UpdateRobotSaveFriend(robot)
 		if err != nil {
-			logrus.Errorf("update robot save error: %v", err)
+			logrus.Errorf("update robot save friend error: %v", err)
 		}
 	}
 }

@@ -41,7 +41,11 @@ func (self *WxHttpSrv) registerHandlers() {
 	self.httpSrv.Route("/startwx", self.httpWrap(self.StartWx))
 	self.httpSrv.Route("/startwx2", self.httpWrap(self.StartWxWithArgv))
 	self.httpSrv.Route("/sendmsgs", self.httpWrap(self.ReceiveSendMsgs))
+	self.httpSrv.Route("/findfriend", self.httpWrap(self.RobotFindFriend))
+	self.httpSrv.Route("/remarkfriend", self.httpWrap(self.RobotRemarkFriend))
+	self.httpSrv.Route("/grouptiren", self.httpWrap(self.RobotGroupTiren))
 	self.httpSrv.Route("/reloadevent", self.httpWrap(self.ReloadEvent))
+	self.httpSrv.Route("/allrobots", self.httpWrap(self.AllRobots))
 }
 
 func (self *WxHttpSrv) httpWrap(handler HttpHandler) func(rsp http.ResponseWriter, req *http.Request) {
@@ -65,7 +69,7 @@ func (self *WxHttpSrv) httpWrap(handler HttpHandler) func(rsp http.ResponseWrite
 			rsp.Write([]byte(errMsg))
 			return
 		}
-		
+
 		rsp.Header().Set("Access-Control-Allow-Origin", "*")
 		rsp.Header().Set("Access-Control-Allow-Methods", "POST")
 		rsp.Header().Set("Access-Control-Allow-Headers", "x-requested-with,content-type")

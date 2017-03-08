@@ -142,7 +142,7 @@ func (self *EventFilter) Run() {
 				v.Do(msg)
 			}
 		case <-self.stop:
-			logrus.Infof("filter do[%s] stopped")
+			logrus.Infof("filter do[%s] stopped", self.Do)
 			return
 		}
 	}

@@ -1,17 +1,18 @@
 package logic
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"sync"
-	"io"
-	"crypto/md5"
-	"os"
-	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/reechou/wxrobot/wxweb"
 	"github.com/reechou/wxrobot/config"
+	"github.com/reechou/wxrobot/wxweb"
 )
 
 type WxManager struct {
@@ -221,6 +222,70 @@ func (self *WxManager) StateGroupNum(wechat, g string) string {
 
 func (self *WxManager) CheckGroupChat(info *CheckGroupChatInfo) {
 
+}
+
+func (self *WxManager) FindFriend(info *RobotFindFriendReq) *wxweb.UserFriend {
+	wx := self.wxs[info.WechatNick]
+	if wx == nil {
+		logrus.Errorf("find friend unknown this wechat[%s].", info.WechatNick)
+		return nil
+	}
+	return wx.Contact.FindFriend(info.UserName, info.NickName)
+}
+
+func (self *WxManager) RemarkFriend(info *RobotRemarkFriendReq) bool {
+	wx := self.wxs[info.WechatNick]
+	if wx == nil {
+		logrus.Errorf("remark friend unknown this wechat[%s].", info.WechatNick)
+		return false
+	}
+
+	uf := wx.Contact.FindFriend(info.UserName, info.NickName)
+	if uf == nil {
+		logrus.Errorf("cannot found this friend[%v]", info)
+		return false
+	}
+
+	ok := wx.WebwxOplog(uf.UserName, info.Remark)
+	if ok {
+		wx.Contact.ChangeFriend(uf.UserName, info.Remark)
+	}
+
+	return ok
+}
+
+func (self *WxManager) GroupTiren(info *RobotGroupTirenReq) (*wxweb.GroupUserInfo, bool) {
+	wx := self.wxs[info.WechatNick]
+	if wx == nil {
+		logrus.Errorf("group tiren unknown this wechat[%s].", info.WechatNick)
+		return nil, false
+	}
+	ug, gui := wx.Contact.FindGroupUser(info.GroupUserName, info.GroupNickName, info.MemberUserName, info.MemberNickName)
+	if gui != nil {
+		ok := wx.DelMemberWebwxupdatechatroom(ug.UserName, gui.UserName)
+		if ok {
+			ug.DelMember(gui.UserName)
+		}
+		return gui, ok
+	}
+	logrus.Errorf("wx[%s] find group user none: %v", wx.Session.MyNickName, info)
+	return nil, false
+}
+
+func (self *WxManager) LoginRobots() []RobotInfo {
+	self.Lock()
+	defer self.Unlock()
+
+	var list []RobotInfo
+	for _, v := range self.wxs {
+		if v.IfLogin() {
+			list = append(list, RobotInfo{
+				RobotWxNick: v.RobotWxNick(),
+				RunTime:     time.Now().Unix() - v.StartTime(),
+			})
+		}
+	}
+	return list
 }
 
 func PathExist(p string) bool {

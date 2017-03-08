@@ -31,12 +31,14 @@ const (
 )
 
 const (
-	FROM_TYPE_PEOPLE            = "people"
-	FROM_TYPE_GROUP             = "group"
-	RECEIVE_EVENT_MSG           = "receivemsg"
-	RECEIVE_EVENT_MOD_GROUP_ADD = "modgroupadd"
-	RECEIVE_EVENT_ADD_FRIEND    = "addfriend"
-	RECEIVE_EVENT_ADD           = "receiveadd"
+	FROM_TYPE_PEOPLE                   = "people"
+	FROM_TYPE_GROUP                    = "group"
+	RECEIVE_EVENT_MSG                  = "receivemsg"
+	RECEIVE_EVENT_MOD_GROUP_ADD        = "modgroupadd"
+	RECEIVE_EVENT_MOD_GROUP_ADD_DETAIL = "modgroupadddetail"
+	RECEIVE_EVENT_ADD_FRIEND           = "addfriend"
+	RECEIVE_EVENT_ADD                  = "receiveadd"
+	RECEIVE_EVENT_ADD_GROUP            = "addgroup"
 )
 
 const (

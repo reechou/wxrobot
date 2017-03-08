@@ -1,3 +1,6 @@
 #filter allwechat anytime addfriend $empty $empty people verifyuser
-filter Lefit铅笔 anytime receivemsg $empty include()测试 group callback^http://127.0.0.1:8818/robot/receive_msg
-filter Lefit铅笔 anytime modgroupadd $empty include()测试 group callback^http://127.0.0.1:8818/robot/receive_msg
+#filter Lefit铅笔 anytime receivemsg $empty include()测试 group callback^http://127.0.0.1:8818/robot/receive_msg
+#filter Lefit铅笔 anytime modgroupadd $empty include()测试 group callback^http://127.0.0.1:8818/robot/receive_msg
+filter Lefit铅笔 anytime receivemsg $empty include()测试 group callback^http://127.0.0.1:7171/robot/receive_msg
+#filter Lefit铅笔 anytime modgroupadd $empty include()测试 group callback^http://127.0.0.1:7171/robot/receive_msg
+filter Lefit铅笔 anytime modgroupadddetail $empty include()测试 group callback^http://127.0.0.1:7171/robot/receive_msg

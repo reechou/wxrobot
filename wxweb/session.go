@@ -1,10 +1,10 @@
 package wxweb
 
 import (
-	"net/http"
 	"encoding/json"
+	"net/http"
 	"time"
-	
+
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/models"
 )
@@ -24,9 +24,9 @@ func (self *WxWeb) getSessionCache() (string, []*http.Cookie) {
 		if err != nil {
 			return "", nil
 		}
-		
+
 		var cookies []*http.Cookie
-		
+
 		for _, c := range cookieInterfaces {
 			b, _ := json.Marshal(c)
 			var cookie *http.Cookie
@@ -35,16 +35,16 @@ func (self *WxWeb) getSessionCache() (string, []*http.Cookie) {
 				cookies = append(cookies, cookie)
 			}
 		}
-		
+
 		return robot.BaseLoginInfo, cookies
 	}
-	
+
 	return "", nil
 }
 
 func (self *WxWeb) checkSession(cookies []*http.Cookie) {
 	now := time.Now().Unix()
-	if now - self.lastSaveCookieTime > 300 {
+	if now-self.lastSaveCookieTime > 300 {
 		self.refreshSessionCache(cookies)
 		self.lastSaveCookieTime = now
 	}
@@ -54,7 +54,7 @@ func (self *WxWeb) refreshSessionCache(cookies []*http.Cookie) {
 	if len(cookies) == 0 {
 		return
 	}
-	
+
 	b, err := json.Marshal(cookies)
 	if err != nil {
 		logrus.Errorf("refresh cookie error: %v", err)
