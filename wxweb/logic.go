@@ -228,6 +228,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				}
 
 				receiveMsg.BaseInfo.FromGroupName = group.NickName
+				receiveMsg.BaseInfo.FromMemberUserName = sendPeople.UserName
 				receiveMsg.BaseInfo.FromNickName = peopleNickname
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
 			} else {
