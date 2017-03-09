@@ -231,6 +231,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.BaseInfo.FromMemberUserName = sendPeople.UserName
 				receiveMsg.BaseInfo.FromNickName = peopleNickname
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
+				receiveMsg.GroupMemberNum = group.GetGroupMemberLen()
 			} else {
 				if receiveMsg.BaseInfo.FromUserName == self.Session.MyUserName {
 					receiveMsg.BaseInfo.FromNickName = self.Session.MyNickName
