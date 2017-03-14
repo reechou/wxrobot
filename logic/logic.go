@@ -99,7 +99,7 @@ func (self *WxLogic) StartWxWithArgv(argv *wxweb.StartWxArgv) *StartWxRsp {
 	return rsp
 }
 
-func (self *WxLogic) WxSendMsgInfo(msg *wxweb.SendMsgInfo) {
+func (self *WxLogic) WxSendMsgInfo(msg *wxweb.SendMsgInfo) bool {
 	for _, v := range msg.SendMsgs {
 		reqMsg := &SendMsgInfo{
 			WeChat:   v.WechatNick,
@@ -109,8 +109,12 @@ func (self *WxLogic) WxSendMsgInfo(msg *wxweb.SendMsgInfo) {
 			MsgType:  v.MsgType,
 			Msg:      v.Msg,
 		}
-		self.wxMgr.SendMsg(reqMsg, reqMsg.Msg)
+		ok := self.wxMgr.SendMsg(reqMsg, reqMsg.Msg)
+		if !ok {
+			return ok
+		}
 	}
+	return true
 }
 
 func (self *WxLogic) RobotFindFriend(info *RobotFindFriendReq) *wxweb.UserFriend {

@@ -49,7 +49,10 @@ func (self *WxHttpSrv) ReceiveSendMsgs(rsp http.ResponseWriter, req *http.Reques
 
 	response := WxResponse{Code: WX_RESPONSE_OK}
 
-	self.l.WxSendMsgInfo(request)
+	ok := self.l.WxSendMsgInfo(request)
+	if !ok {
+		response.Code = WX_RESPONSE_ERR
+	}
 
 	return response, nil
 }

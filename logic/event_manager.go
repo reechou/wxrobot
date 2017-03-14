@@ -165,6 +165,7 @@ func (self *EventManager) Run() {
 					case v.GetMsgChan() <- msg:
 					case <-msg.ctx.Done():
 						logrus.Errorf("receive msg into filter msg channal error: %v", msg.ctx.Err())
+						self.Unlock()
 						continue
 					}
 				}
@@ -176,6 +177,7 @@ func (self *EventManager) Run() {
 					case v.GetMsgChan() <- msg:
 					case <-msg.ctx.Done():
 						logrus.Errorf("receive msg into filter msg channal error: %v", msg.ctx.Err())
+						self.Unlock()
 						continue
 					}
 				}

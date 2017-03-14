@@ -1248,6 +1248,30 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 	}
 }
 
+func (self *WxWeb) WebwxverifyuserAdd(opcode int, verifyContent, userName string) bool {
+	urlstr := fmt.Sprintf("%s/webwxverifyuser?r=%s", self.Session.BaseUri, self._unixStr())
+	params := make(map[string]interface{})
+	params["BaseRequest"] = self.Session.BaseRequest
+	params["Opcode"] = opcode
+	params["SceneList"] = []int{33}
+	params["SceneListCount"] = 1
+	params["VerifyContent"] = verifyContent
+	params["VerifyUserList"] = []map[string]interface{}{map[string]interface{}{"Value": userName, "VerifyUserTicket": ""}}
+	params["VerifyUserListSize"] = 1
+	params["skey"] = self.Session.SKey
+	data, err := self._post(urlstr, params, true)
+	if err != nil {
+		logrus.Errorf("WebwxverifyuserAdd error: %v", err)
+		return false
+	} else {
+		if CheckWebwxRetcode(data) {
+			return true
+		}
+		logrus.Errorf("WebwxverifyuserAdd[%s] usrname[%s] get error data[%s].", urlstr, userName, data)
+		return false
+	}
+}
+
 func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) {
 	now := time.Now().Unix()
 
@@ -1429,6 +1453,36 @@ func (self *WxWeb) Webwxsendmsg(message string, toUserName string) bool {
 			return true
 		}
 		logrus.Errorf("wx[%s] send msg[%s] error.", self.Session.MyNickName, message)
+	}
+	return false
+}
+
+func (self *WxWeb) WebwxsendmsgOfShare(message string, toUserName string) bool {
+	urlstr := fmt.Sprintf("%s/webwxsendmsg?pass_ticket=%s", self.Session.BaseUri, self.Session.PassTicket)
+	clientMsgId := self._unixStr() + "0" + strconv.Itoa(rand.Int())[3:6]
+	params := make(map[string]interface{})
+	params["BaseRequest"] = self.Session.BaseRequest
+	msg := make(map[string]interface{})
+	msg["Type"] = 7
+	msg["Title"] = message
+	msg["Desc"] = "百度一下"
+	msg["Url"] = "http://www.baidu.com"
+	msg["From"] = "http://www.baidu.com"
+	msg["FromUserName"] = self.Session.User["UserName"]
+	msg["ToUserName"] = toUserName
+	msg["LocalID"] = clientMsgId
+	msg["ClientMsgId"] = clientMsgId
+	params["Msg"] = msg
+	data, err := self._post(urlstr, params, true)
+	if err != nil {
+		logrus.Errorf("wx send share msg[%s] toUserName[%s] error: %s", message, toUserName, err)
+		return false
+	} else {
+		if CheckWebwxRetcode(data) {
+			logrus.Debugf("wx[%s] send share msg[%s] toUserName[%s] success.", self.Session.MyNickName, message, toUserName)
+			return true
+		}
+		logrus.Errorf("wx[%s] send share msg[%s] error.", self.Session.MyNickName, message)
 	}
 	return false
 }
@@ -1675,12 +1729,14 @@ func (self *WxWeb) Run() {
 }
 
 func (self *WxWeb) testUploadMedia() {
-	mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
-	if ok {
-		self.Webwxsendmsgimg(self.TestUserName, mediaId)
-		//time.Sleep(time.Hour)
-		//self.Webwxsendmsgimg(self.TestUserName, mediaId)
-
-		self.Webwxsendmsg("xxxxx", self.TestUserName)
-	}
+	self.WebwxsendmsgOfShare("xxxx", self.TestUserName)
+	
+	//mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
+	//if ok {
+	//	self.Webwxsendmsgimg(self.TestUserName, mediaId)
+	//	//time.Sleep(time.Hour)
+	//	//self.Webwxsendmsgimg(self.TestUserName, mediaId)
+	//
+	//	self.Webwxsendmsg("xxxxx", self.TestUserName)
+	//}
 }

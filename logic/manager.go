@@ -56,11 +56,11 @@ func (self *WxManager) UnregisterWx(wx *wxweb.WxWeb) {
 	}
 }
 
-func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
+func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) bool {
 	wx := self.wxs[msg.WeChat]
 	if wx == nil {
 		logrus.Errorf("send msg unknown this wechat[%s].", msg.WeChat)
-		return
+		return false
 	}
 	switch msg.ChatType {
 	case CHAT_TYPE_PEOPLE:
@@ -72,7 +72,7 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 				uf := wx.Contact.NickFriends[msg.Name]
 				if uf == nil {
 					logrus.Errorf("unkown this friend[%s]", msg.Name)
-					return
+					return false
 				}
 				userName = uf.UserName
 				logrus.Debugf("send msg to people find username[%s] from name[%s]", userName, msg.Name)
@@ -83,14 +83,14 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 			uf := wx.Contact.NickFriends[msg.Name]
 			if uf == nil {
 				logrus.Errorf("unkown this friend[%s]", msg.Name)
-				return
+				return false
 			}
 			userName = uf.UserName
 		}
 		if msg.MsgType == MSG_TYPE_TEXT {
-			wx.Webwxsendmsg(msgStr, userName)
+			return wx.Webwxsendmsg(msgStr, userName)
 		} else if msg.MsgType == MSG_TYPE_IMG {
-			self.sendImg(userName, msgStr, wx)
+			return self.sendImg(userName, msgStr, wx)
 		}
 	case CHAT_TYPE_GROUP:
 		var userName string
@@ -101,7 +101,7 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 				group := wx.Contact.GetNickGroup(msg.Name)
 				if group == nil {
 					logrus.Errorf("unkown this group[%s]", msg.Name)
-					return
+					return false
 				}
 				userName = group.UserName
 				logrus.Debugf("send msg to group find username[%s] from name[%s]", userName, msg.Name)
@@ -112,19 +112,20 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) {
 			group := wx.Contact.GetNickGroup(msg.Name)
 			if group == nil {
 				logrus.Errorf("unkown this group[%s]", msg.Name)
-				return
+				return false
 			}
 			userName = group.UserName
 		}
 		if msg.MsgType == MSG_TYPE_TEXT {
-			wx.Webwxsendmsg(msgStr, userName)
+			return wx.Webwxsendmsg(msgStr, userName)
 		} else if msg.MsgType == MSG_TYPE_IMG {
-			self.sendImg(userName, msgStr, wx)
+			return self.sendImg(userName, msgStr, wx)
 		}
 	}
+	return false
 }
 
-func (self *WxManager) sendImg(userName, imgMsg string, wx *wxweb.WxWeb) {
+func (self *WxManager) sendImg(userName, imgMsg string, wx *wxweb.WxWeb) bool {
 	if strings.HasPrefix(imgMsg, "http") {
 		logrus.Debugf("send img[%s] to username[%s]", imgMsg, userName)
 		imgPath := fmt.Sprintf("%s/%s.jpg", self.cfg.TempPicDir, fmt.Sprintf("%x", md5.Sum([]byte(imgMsg))))
@@ -133,29 +134,30 @@ func (self *WxManager) sendImg(userName, imgMsg string, wx *wxweb.WxWeb) {
 			res, err := http.Get(imgMsg)
 			if err != nil {
 				logrus.Errorf("http get img[%s] error: %v", imgMsg, err)
-				return
+				return false
 			}
 			out, err := os.Create(imgPath)
 			if err != nil {
 				logrus.Errorf("os create img[%s] error: %v", imgPath, err)
-				return
+				return false
 			}
 			_, err = io.Copy(out, res.Body)
 			if err != nil {
 				logrus.Errorf("io copy img[%s] error: %v", imgPath, err)
-				return
+				return false
 			}
 		}
 		mediaId, ok := wx.Webwxuploadmedia(userName, imgPath)
 		if ok {
-			wx.Webwxsendmsgimg(userName, mediaId)
+			return wx.Webwxsendmsgimg(userName, mediaId)
 		}
 	} else {
 		mediaId, ok := wx.Webwxuploadmedia(userName, imgMsg)
 		if ok {
-			wx.Webwxsendmsgimg(userName, mediaId)
+			return wx.Webwxsendmsgimg(userName, mediaId)
 		}
 	}
+	return false
 }
 
 func (self *WxManager) SendImgMsg(msg *SendImgInfo) {
