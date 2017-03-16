@@ -135,6 +135,29 @@ func (self *WxLogic) RobotGroupTiren(info *RobotGroupTirenReq) (*wxweb.GroupUser
 	return self.wxMgr.GroupTiren(info)
 }
 
+func (self *WxLogic) RobotGetGroupMemberList(info *RobotGetGroupMemberListReq) ([]*wxweb.GroupUserInfo, bool) {
+	memberMap, ok := self.wxMgr.GetGroupMemberList(info)
+	if !ok {
+		logrus.Errorf("robot get group member list error.")
+		return nil, ok
+	}
+	var memberList []*wxweb.GroupUserInfo
+	for _, v := range memberMap {
+		memberList = append(memberList, v)
+	}
+	return memberList, ok
+}
+
+func (self *WxLogic) RobotVerifyAddFriend(info *RobotAddFriendReq) bool {
+	ok := self.wxMgr.AddFriend(info)
+	if ok {
+		logrus.Debugf("wx add frined[%v] success.", info)
+	} else {
+		logrus.Errorf("wx add frined[%v] error.", info)
+	}
+	return ok
+}
+
 func (self *WxLogic) GetAllRobots() []RobotInfo {
 	return self.wxMgr.LoginRobots()
 }

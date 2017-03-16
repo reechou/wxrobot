@@ -274,6 +274,29 @@ func (self *WxManager) GroupTiren(info *RobotGroupTirenReq) (*wxweb.GroupUserInf
 	return nil, false
 }
 
+func (self *WxManager) GetGroupMemberList(info *RobotGetGroupMemberListReq) (map[string]*wxweb.GroupUserInfo, bool) {
+	wx := self.wxs[info.WechatNick]
+	if wx == nil {
+		logrus.Errorf("get group member list unknown this wechat[%s].", info.WechatNick)
+		return nil, false
+	}
+	ug := wx.Contact.FindGroup(info.GroupUserName, info.GroupNickName)
+	if ug == nil {
+		logrus.Errorf("cannot found this group[%v]", info)
+		return nil, false
+	}
+	return ug.GetMemberList(), true
+}
+
+func (self *WxManager) AddFriend(info *RobotAddFriendReq) bool {
+	wx := self.wxs[info.WechatNick]
+	if wx == nil {
+		logrus.Errorf("add friend unknown this wechat[%s].", info.WechatNick)
+		return false
+	}
+	return wx.WebwxverifyuserAdd(wxweb.WX_VERIFY_USER_OP_ADD, info.VerifyContent, info.UserName)
+}
+
 func (self *WxManager) LoginRobots() []RobotInfo {
 	self.Lock()
 	defer self.Unlock()

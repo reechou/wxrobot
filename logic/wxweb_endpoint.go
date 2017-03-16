@@ -108,6 +108,42 @@ func (self *WxHttpSrv) RobotGroupTiren(rsp http.ResponseWriter, req *http.Reques
 	return response, nil
 }
 
+func (self *WxHttpSrv) RobotGetGroupMemberList(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
+	request := &RobotGetGroupMemberListReq{}
+	if err := json.NewDecoder(req.Body).Decode(request); err != nil {
+		logrus.Errorf("RobotGetGroupMemberList json decode error: %v", err)
+		return nil, err
+	}
+	
+	response := WxResponse{Code: WX_RESPONSE_OK}
+	
+	list, ok := self.l.RobotGetGroupMemberList(request)
+	if !ok {
+		response.Code = WX_RESPONSE_ERR
+	} else {
+		response.Data = list
+	}
+	
+	return response, nil
+}
+
+func (self *WxHttpSrv) RobotAddFriend(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
+	request := &RobotAddFriendReq{}
+	if err := json.NewDecoder(req.Body).Decode(request); err != nil {
+		logrus.Errorf("RobotAddFriend json decode error: %v", err)
+		return nil, err
+	}
+	
+	response := WxResponse{Code: WX_RESPONSE_OK}
+	
+	ok := self.l.RobotVerifyAddFriend(request)
+	if !ok {
+		response.Code = WX_RESPONSE_ERR
+	}
+	
+	return response, nil
+}
+
 func (self *WxHttpSrv) ReloadEvent(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	response := WxResponse{Code: WX_RESPONSE_OK}
 

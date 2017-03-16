@@ -154,6 +154,13 @@ func (self *UserGroup) SetMemberList(memberList, nickMemberList map[string]*Grou
 	self.NickMemberList = nickMemberList
 }
 
+func (self *UserGroup) GetMemberList() map[string]*GroupUserInfo {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+	
+	return self.MemberList
+}
+
 func (self *UserGroup) GetMemberFromList(username string) *GroupUserInfo {
 	self.memberMutex.Lock()
 	defer self.memberMutex.Unlock()

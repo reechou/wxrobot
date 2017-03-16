@@ -31,6 +31,18 @@ type RobotGroupTirenReq struct {
 	MemberNickName string `json:"memberNickName"`
 }
 
+type RobotGetGroupMemberListReq struct {
+	WechatNick    string `json:"wechatNick"`
+	GroupUserName string `json:"groupUserName"`
+	GroupNickName string `json:"groupNickName"`
+}
+
+type RobotAddFriendReq struct {
+	WechatNick    string `json:"wechatNick"`
+	UserName      string `json:"userName"`
+	VerifyContent string `json:"verifyContent"`
+}
+
 type StartWxRsp struct {
 	UUID       string `json:"uuid"`
 	QrcodeUrl  string `json:"qrcodeUrl"`
