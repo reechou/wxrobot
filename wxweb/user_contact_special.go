@@ -1,10 +1,10 @@
 package wxweb
 
 import (
-	"time"
 	"math/rand"
 	"strings"
-	
+	"time"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -140,7 +140,7 @@ func (self *UserContact) PrintGroupInfo() {
 			// check verify user
 			//self.wx.Webwxverifyuser(WX_VERIFY_USER_OP_ADD, "你好", "", v2.UserName)
 			//time.Sleep(10 * time.Second)
-			
+
 			_, ok := members[v2.UserName]
 			if ok {
 				cfNum++
@@ -148,7 +148,7 @@ func (self *UserContact) PrintGroupInfo() {
 			}
 			members[v2.UserName] = 1
 		}
-		
+
 		// test
 		//if v.NickName == "xxxx" {
 		//	logrus.Debugf("xxxx: %v", v)

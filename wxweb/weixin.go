@@ -1730,7 +1730,7 @@ func (self *WxWeb) Run() {
 
 func (self *WxWeb) testUploadMedia() {
 	self.WebwxsendmsgOfShare("xxxx", self.TestUserName)
-	
+
 	//mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
 	//if ok {
 	//	self.Webwxsendmsgimg(self.TestUserName, mediaId)

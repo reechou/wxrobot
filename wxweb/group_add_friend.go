@@ -2,7 +2,7 @@ package wxweb
 
 type GroupMember struct {
 	GroupUserName string
-	Member *GroupUserInfo
+	Member        *GroupUserInfo
 }
 
 type GroupAddFriendLogic struct {
@@ -11,6 +11,6 @@ type GroupAddFriendLogic struct {
 
 func NewGroupAddFriendLogic(wx *WxWeb) *GroupAddFriendLogic {
 	ngaf := &GroupAddFriendLogic{wx: wx}
-	
+
 	return ngaf
 }

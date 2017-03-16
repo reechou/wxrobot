@@ -114,16 +114,16 @@ func (self *WxHttpSrv) RobotGetGroupMemberList(rsp http.ResponseWriter, req *htt
 		logrus.Errorf("RobotGetGroupMemberList json decode error: %v", err)
 		return nil, err
 	}
-	
+
 	response := WxResponse{Code: WX_RESPONSE_OK}
-	
+
 	list, ok := self.l.RobotGetGroupMemberList(request)
 	if !ok {
 		response.Code = WX_RESPONSE_ERR
 	} else {
 		response.Data = list
 	}
-	
+
 	return response, nil
 }
 
@@ -133,14 +133,14 @@ func (self *WxHttpSrv) RobotAddFriend(rsp http.ResponseWriter, req *http.Request
 		logrus.Errorf("RobotAddFriend json decode error: %v", err)
 		return nil, err
 	}
-	
+
 	response := WxResponse{Code: WX_RESPONSE_OK}
-	
+
 	ok := self.l.RobotVerifyAddFriend(request)
 	if !ok {
 		response.Code = WX_RESPONSE_ERR
 	}
-	
+
 	return response, nil
 }
 

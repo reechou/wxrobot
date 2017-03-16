@@ -46,7 +46,7 @@ func (self *WxHttpSrv) registerHandlers() {
 	self.httpSrv.Route("/grouptiren", self.httpWrap(self.RobotGroupTiren))
 	self.httpSrv.Route("/group_member_list", self.httpWrap(self.RobotGetGroupMemberList))
 	self.httpSrv.Route("/addfriend", self.httpWrap(self.RobotAddFriend))
-	
+
 	self.httpSrv.Route("/reloadevent", self.httpWrap(self.ReloadEvent))
 	self.httpSrv.Route("/allrobots", self.httpWrap(self.AllRobots))
 }
