@@ -3,6 +3,7 @@ package logic
 import (
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/config"
@@ -43,6 +44,7 @@ func NewWxLogic(cfg *config.Config) *WxLogic {
 	l.raExt = ext.NewRobotAccount(cfg)
 
 	models.InitDB(cfg)
+	l.Resume()
 
 	//err := l.memberRedis.StartAndGC()
 	//if err != nil {
@@ -56,7 +58,7 @@ func NewWxLogic(cfg *config.Config) *WxLogic {
 	//if err != nil {
 	//	panic(err)
 	//}
-
+	
 	go l.runCheck()
 
 	return l
@@ -71,10 +73,29 @@ func (self *WxLogic) Run() {
 	self.wxSrv.Run()
 }
 
+func (self *WxLogic) Resume() {
+	robotList, err := models.GetAllRobots(wxweb.HostIP)
+	if err != nil {
+		logrus.Errorf("resume get all robots error: %v", err)
+		return
+	}
+	for _, v := range robotList {
+		logrus.Debugf("start resume robot[%s] wechat", v.RobotWx)
+		wx := wxweb.NewWxWebWithArgv(self.cfg, self, &wxweb.StartWxArgv{})
+		ok := wx.Resume(&v)
+		if ok {
+			self.Lock()
+			self.wxs[wx.UUID()] = wx
+			self.Unlock()
+			self.wxMgr.RegisterWx(wx)
+		}
+	}
+}
+
 func (self *WxLogic) StartWx() string {
 	wx := wxweb.NewWxWeb(self.cfg, self)
 	wx.Start()
-	go wx.Run()
+	//go wx.Run()
 	self.Lock()
 	self.wxs[wx.UUID()] = wx
 	self.Unlock()
@@ -85,7 +106,7 @@ func (self *WxLogic) StartWx() string {
 func (self *WxLogic) StartWxWithArgv(argv *wxweb.StartWxArgv) *StartWxRsp {
 	wx := wxweb.NewWxWebWithArgv(self.cfg, self, argv)
 	wx.Start()
-	go wx.Run()
+	//go wx.Run()
 	self.Lock()
 	self.wxs[wx.UUID()] = wx
 	self.Unlock()
@@ -101,13 +122,14 @@ func (self *WxLogic) StartWxWithArgv(argv *wxweb.StartWxArgv) *StartWxRsp {
 
 func (self *WxLogic) WxSendMsgInfo(msg *wxweb.SendMsgInfo) bool {
 	for _, v := range msg.SendMsgs {
+		msgStr := strings.Replace(v.Msg, "\u0026", "&", -1)
 		reqMsg := &SendMsgInfo{
 			WeChat:   v.WechatNick,
 			ChatType: v.ChatType,
 			Name:     v.NickName,
 			UserName: v.UserName,
 			MsgType:  v.MsgType,
-			Msg:      v.Msg,
+			Msg:      msgStr,
 		}
 		ok := self.wxMgr.SendMsg(reqMsg, reqMsg.Msg)
 		if !ok {

@@ -63,9 +63,10 @@ type UserGroup struct {
 	NickName    string
 	UserName    string
 
-	memberMutex    sync.Mutex
-	MemberList     map[string]*GroupUserInfo
-	NickMemberList map[string]*GroupUserInfo
+	memberMutex        sync.Mutex
+	MemberList         map[string]*GroupUserInfo
+	NickMemberList     map[string]*GroupUserInfo
+	OriginalMemberList []*GroupUserInfo
 
 	wx *WxWeb
 
@@ -146,12 +147,13 @@ func (self *UserGroup) FindMember(username, nickname string) *GroupUserInfo {
 	return self.NickMemberList[nickname]
 }
 
-func (self *UserGroup) SetMemberList(memberList, nickMemberList map[string]*GroupUserInfo) {
+func (self *UserGroup) SetMemberList(memberList, nickMemberList map[string]*GroupUserInfo, originalMemberList []*GroupUserInfo) {
 	self.memberMutex.Lock()
 	defer self.memberMutex.Unlock()
 
 	self.MemberList = memberList
 	self.NickMemberList = nickMemberList
+	self.OriginalMemberList = originalMemberList
 }
 
 func (self *UserGroup) GetMemberList() map[string]*GroupUserInfo {
@@ -159,6 +161,13 @@ func (self *UserGroup) GetMemberList() map[string]*GroupUserInfo {
 	defer self.memberMutex.Unlock()
 
 	return self.MemberList
+}
+
+func (self *UserGroup) GetOriginalMemberList() []*GroupUserInfo {
+	self.memberMutex.Lock()
+	defer self.memberMutex.Unlock()
+
+	return self.OriginalMemberList
 }
 
 func (self *UserGroup) GetMemberFromList(username string) *GroupUserInfo {

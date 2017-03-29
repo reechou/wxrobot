@@ -66,6 +66,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					memberList := modContact["MemberList"].([]interface{})
 					memberListMap := make(map[string]*GroupUserInfo)
 					nickMemberListMap := make(map[string]*GroupUserInfo)
+					var originalMemberList []*GroupUserInfo
 					for _, v2 := range memberList {
 						member := v2.(map[string]interface{})
 						if member == nil {
@@ -85,9 +86,15 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						}
 						memberListMap[userName] = gui
 						nickMemberListMap[nickName] = gui
+						if self.argv.IfSaveGroupMember {
+							originalMemberList = append(originalMemberList, gui)
+						}
 					}
 					group.ModMember(memberListMap)
-					group.SetMemberList(memberListMap, nickMemberListMap)
+					group.SetMemberList(memberListMap, nickMemberListMap, originalMemberList)
+					if self.argv.IfSaveGroupMember {
+						self.agml.AddGroup(userName)
+					}
 					self.Contact.SetGroup(userName, group)
 					self.Contact.SetNickGroup(groupNickName, group)
 
@@ -125,6 +132,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						if !ok {
 							logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
 						} else {
+							logrus.Debugf("mod contact webwxoplog success.")
 							realName = realNickName
 						}
 

@@ -26,9 +26,14 @@ func InitDB(cfg *config.Config) {
 	//x.SetLogger(nil)
 	x.SetMapper(core.GonicMapper{})
 	x.TZLocation, _ = time.LoadLocation("Asia/Shanghai")
-	x.ShowSQL(true)
-
-	//if err = x.Sync2(); err != nil {
-	//	logrus.Fatalf("Fail to sync database: %v", err)
-	//}
+	
+	if cfg.IfShowSqlLog {
+		x.ShowSQL(true)
+	}
+	
+	if cfg.IfNeedOwnerDB {
+		if err = x.Sync2(new(Robot)); err != nil {
+			logrus.Fatalf("Fail to sync database: %v", err)
+		}
+	}
 }

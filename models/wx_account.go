@@ -15,8 +15,8 @@ type Robot struct {
 	Ip            string `xorm:"not null default '' varchar(64)"`
 	OfPort        string `xorm:"not null default '' varchar(64)"`
 	LastLoginTime int64  `xorm:"not null default 0 int"`
-	BaseLoginInfo string `xorm:"not null default '' varchar(768)"`
-	WebwxCookie   string `xorm:"not null default '' varchar(768)"`
+	BaseLoginInfo string `xorm:"not null default '' varchar(2048)"`
+	WebwxCookie   string `xorm:"not null default '' varchar(2048)"`
 	CreatedAt     int64  `xorm:"not null default 0 int"`
 	UpdatedAt     int64  `xorm:"not null default 0 int"`
 }
@@ -51,6 +51,15 @@ func GetRobot(info *Robot) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func GetAllRobots(ip string) ([]Robot, error) {
+	var list []Robot
+	err := x.Where("ip = ?", ip).Find(&list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 func UpdateRobotSaveFriend(info *Robot) error {

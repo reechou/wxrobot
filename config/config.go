@@ -37,6 +37,9 @@ type Config struct {
 	IfInvite     bool
 	InviteMsg    string
 
+	IfShowSqlLog  bool
+	IfNeedOwnerDB bool
+
 	WxEventFile string
 	QRCodeDir   string
 	TempPicDir  string

@@ -250,6 +250,7 @@ func (self *WxManager) RemarkFriend(info *RobotRemarkFriendReq) bool {
 
 	ok := wx.WebwxOplog(uf.UserName, info.Remark)
 	if ok {
+		logrus.Debugf("endpoint remark firend webwxoplog success.")
 		wx.Contact.ChangeFriend(uf.UserName, info.Remark)
 	}
 

@@ -3,7 +3,6 @@ package wxweb
 
 import (
 	"bytes"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,14 +10,11 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
-	"net/http/cookiejar"
 	"net/textproto"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,24 +31,6 @@ func debugPrint(content interface{}) {
 	if debug == true {
 		fmt.Println(content)
 	}
-}
-
-type StartWxArgv struct {
-	IfInvite             bool     `json:"ifInvite,omitempty"`
-	IfInviteEndExit      bool     `json:"inviteEndExit,omitempty"`
-	InviteMsg            string   `json:"inviteMsg,omitempty"`
-	IfClearWx            bool     `json:"ifClearWx,omitempty"`
-	ClearWxMsg           string   `json:"clearWxMsg,omitempty"`
-	ClearWxPrefix        string   `json:"clearWxPrefix,omitempty"`
-	IfSaveRobotFriends   bool     `json:"ifSaveRobotFriends,omitempty"`
-	IfSaveRobotGroups    bool     `json:"ifSaveRobotGroups,omitempty"`
-	IfNotReplaceEmoji    bool     `json:"ifNotReplaceEmoji,omitempty"`
-	IfCreateGroup        bool     `json:"ifCreateGroup,omitempty"`
-	CreateGroupPrefix    string   `json:"createGroupPrefix,omitempty"`
-	CreateGroupStart     int      `json:"createGroupStart,omitempty"`
-	CreateGroupNum       int      `json:"createGroupNum,omitempty"`
-	CreateGroupUsers     []string `json:"createGroupUsers,omitempty"`
-	IfNotChangeGroupName bool     `json:"ifNotChangeGroupName,omitempty"`
 }
 
 type WxHandler interface {
@@ -81,6 +59,7 @@ type WebWxSession struct {
 	BaseRequest map[string]interface{}
 	SyncHost    string
 	MediaCount  int64
+	QrcodePath  string
 }
 
 type WxWebMediaInfo struct {
@@ -100,7 +79,6 @@ type WxWeb struct {
 	SpecialUsers   map[string]int
 	TestUserName   string
 	QrcodeUrl      string
-	QrcodePath     string
 
 	cfg *config.Config
 
@@ -108,6 +86,7 @@ type WxWeb struct {
 	Contact   *UserContact
 	wxh       WxHandler
 	argv      *StartWxArgv
+	agml      *AddGroupMember
 
 	lastSaveCookieTime int64
 
@@ -207,9 +186,9 @@ func (self *WxWeb) Clear() {
 	self.Lock()
 	defer self.Unlock()
 	if !self.ifCleared {
-		err := os.Remove(self.QrcodePath)
+		err := os.Remove(self.Session.QrcodePath)
 		if err != nil {
-			logrus.Errorf("remove qrcode[%s] error: %v", self.QrcodePath, err)
+			logrus.Errorf("remove qrcode[%s] error: %v", self.Session.QrcodePath, err)
 		}
 		self.ifCleared = true
 	}
@@ -232,7 +211,7 @@ func (self *WxWeb) QRCODE() string {
 }
 
 func (self *WxWeb) QRCODEPath() string {
-	return self.QrcodePath
+	return self.Session.QrcodePath
 }
 
 func (self *WxWeb) IfLogin() bool {
@@ -245,42 +224,6 @@ func (self *WxWeb) IfLogout() bool {
 
 func (self *WxWeb) StartTime() int64 {
 	return self.startTime
-}
-
-func (self *WxWeb) getUuid(args ...interface{}) bool {
-	urlstr := "https://login.weixin.qq.com/jslogin"
-	urlstr += "?appid=wx782c26e4c19acffb&fun=new&lang=zh_CN&_=" + self._unixStr()
-	data, _ := self._get(urlstr, false)
-	logrus.Debugf("get uuid url[%s] data:%s", urlstr, data)
-	re := regexp.MustCompile(`"([\S]+)"`)
-	find := re.FindStringSubmatch(data)
-	if len(find) > 1 {
-		self.Session.Uuid = find[1]
-		return true
-	} else {
-		return false
-	}
-}
-
-func (self *WxWeb) _run(desc string, f func(...interface{}) bool, args ...interface{}) {
-	start := time.Now().UnixNano()
-	logrus.Info(desc)
-	var result bool
-	if len(args) > 1 {
-		result = f(args)
-	} else if len(args) == 1 {
-		result = f(args[0])
-	} else {
-		result = f()
-	}
-	useTime := fmt.Sprintf("%.5f", (float64(time.Now().UnixNano()-start) / 1000000000))
-	if result {
-		logrus.Infof("\t成功,用时 %s 秒", useTime)
-	} else {
-		logrus.Errorf("%s\t失败\n[*] 退出该微信", desc)
-		self.ifLogin = false
-		self.ifLogout = true
-	}
 }
 
 func (self *WxWeb) _postFile(urlstr string, req *bytes.Buffer) (string, error) {
@@ -299,11 +242,11 @@ func (self *WxWeb) _postFile(urlstr string, req *bytes.Buffer) (string, error) {
 	request.Header.Add("Origin", "https://"+self.Session.BaseHost)
 	request.Header.Add("Referer", "https://"+self.Session.BaseHost+"/?&lang=zh_CN")
 	request.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36")
-	if self.cookies != nil {
-		for _, v := range self.cookies {
-			request.AddCookie(v)
-		}
-	}
+	//if self.cookies != nil {
+	//	for _, v := range self.cookies {
+	//		request.AddCookie(v)
+	//	}
+	//}
 	resp, err = self.httpClient.Do(request)
 
 	if err != nil || resp == nil {
@@ -331,17 +274,12 @@ func (self *WxWeb) _post(urlstr string, params map[string]interface{}, jsonFmt b
 		if err != nil {
 			return "", err
 		}
-		//fmt.Println(request.URL.Host)
-		//for _, v := range self.httpClient.Jar.Cookies(request.URL) {
-		//	fmt.Println(v.String())
-		//}
 		request.Header.Set("Content-Type", "application/json;charset=utf-8")
 		request.Header.Add("Referer", "https://"+self.Session.BaseHost)
 		request.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36")
 		if self.cookies != nil {
 			for _, v := range self.cookies {
 				request.AddCookie(v)
-				//fmt.Println("save : ", v.String())
 			}
 		}
 		resp, err = self.httpClient.Do(request)
@@ -356,6 +294,10 @@ func (self *WxWeb) _post(urlstr string, params map[string]interface{}, jsonFmt b
 	if err != nil || resp == nil {
 		logrus.Error("post error:", err)
 		return "", err
+	}
+	if len(resp.Cookies()) > 0 {
+		self.cookies = resp.Cookies()
+		self.checkSession(self.cookies)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -385,15 +327,15 @@ func (self *WxWeb) _get(urlstr string, jsonFmt bool) (string, error) {
 	if self.cookies != nil {
 		for _, v := range self.cookies {
 			request.AddCookie(v)
-			//fmt.Println("save : ", v.String())
 		}
 	}
 	resp, err := self.httpClient.Do(request)
 	if err != nil {
 		return res, err
 	}
-	if resp.Cookies() != nil && len(resp.Cookies()) > 0 {
+	if len(resp.Cookies()) > 0 {
 		self.cookies = resp.Cookies()
+		self.checkSession(self.cookies)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -405,158 +347,6 @@ func (self *WxWeb) _get(urlstr string, jsonFmt bool) (string, error) {
 
 func (self *WxWeb) _unixStr() string {
 	return strconv.Itoa(int(time.Now().UnixNano() / 1000000))
-}
-
-func (self *WxWeb) genQRcode(args ...interface{}) bool {
-	urlstr := "https://login.weixin.qq.com/qrcode/" + self.Session.Uuid
-	urlstr += "?t=webwx"
-	urlstr += "&_=" + self._unixStr()
-	self.QrcodeUrl = urlstr
-	logrus.Debugf("start wx qrcode url: %s", self.QrcodeUrl)
-	self.QrcodePath = self.cfg.QRCodeDir + self.Session.Uuid + ".jpg"
-	out, err := os.Create(self.QrcodePath)
-	resp, err := self._get(urlstr, false)
-	_, err = io.Copy(out, bytes.NewReader([]byte(resp)))
-	if err != nil {
-		return false
-	} else {
-		if runtime.GOOS == "darwin" {
-			exec.Command("open", self.QrcodePath).Run()
-		}
-		//else {
-		//	go func() {
-		//		fmt.Println("please open on web browser ip:8889/qrcode")
-		//		http.HandleFunc("/qrcode", func(w http.ResponseWriter, req *http.Request) {
-		//			http.ServeFile(w, req, "qrcode.jpg")
-		//			return
-		//		})
-		//		http.ListenAndServe(":8889", nil)
-		//	}()
-		//}
-		return true
-	}
-}
-
-func (self *WxWeb) waitForLogin(tip int) bool {
-	// https://login.wx.qq.com/cgi-bin/mmwebwx-bin/login?loginicon=true&uuid=wed6_NBBLA==&tip=0&r=1997008698&_=1488356620032
-	time.Sleep(time.Duration(tip) * time.Second)
-	//url := "https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login"
-	url := "https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login"
-	url += "?tip=" + strconv.Itoa(tip) + "&uuid=" + self.Session.Uuid + "&_=" + self._unixStr()
-	logrus.Debugf("wait for login url: %s", url)
-	data, err := self._get(url, false)
-	if err != nil {
-		logrus.Errorf("wait for login error: %v", err)
-		return false
-	}
-	logrus.Debug(data)
-	re := regexp.MustCompile(`window.code=(\d+);`)
-	find := re.FindStringSubmatch(data)
-	if len(find) > 1 {
-		code := find[1]
-		if code == "201" {
-			if tip == 0 {
-				return false
-			}
-			return true
-		} else if code == "200" {
-			re := regexp.MustCompile(`window.redirect_uri="(\S+?)";`)
-			find := re.FindStringSubmatch(data)
-			if len(find) > 1 {
-				r_uri := find[1] + "&fun=new"
-				self.Session.RedirectUri = r_uri
-				re = regexp.MustCompile(`/`)
-				finded := re.FindAllStringIndex(r_uri, -1)
-				self.Session.BaseUri = r_uri[:finded[len(finded)-1][0]]
-				self.Session.BaseHost = self.Session.BaseUri[8:]
-				self.Session.BaseHost = self.Session.BaseHost[:strings.Index(self.Session.BaseHost, "/")]
-				logrus.Debugf("webwx base uri: %s", self.Session.BaseHost)
-				return true
-			}
-			return false
-		} else if code == "408" {
-			logrus.Errorf("uuid[%s] [登陆超时]", self.Session.Uuid)
-		} else {
-			logrus.Errorf("uuid[%s] [登陆异常]", self.Session.Uuid)
-		}
-	}
-	return false
-}
-
-func (self *WxWeb) login(args ...interface{}) bool {
-	logrus.Debugf("login redirect uri: %s", self.Session.RedirectUri)
-	if self.Session.RedirectUri == "" {
-		return false
-	}
-	data, _ := self._get(self.Session.RedirectUri, false)
-	type Result struct {
-		Skey       string `xml:"skey"`
-		Wxsid      string `xml:"wxsid"`
-		Wxuin      string `xml:"wxuin"`
-		PassTicket string `xml:"pass_ticket"`
-	}
-	v := Result{}
-	err := xml.Unmarshal([]byte(data), &v)
-	if err != nil {
-		fmt.Printf("error: %v", err)
-		return false
-	}
-	self.Session.SKey = v.Skey
-	self.Session.Sid = v.Wxsid
-	self.Session.Uin = v.Wxuin
-	self.Session.PassTicket = v.PassTicket
-	self.Session.BaseRequest = make(map[string]interface{})
-	self.Session.BaseRequest["Uin"], _ = strconv.Atoi(v.Wxuin)
-	self.Session.BaseRequest["Sid"] = v.Wxsid
-	self.Session.BaseRequest["Skey"] = v.Skey
-	self.Session.BaseRequest["DeviceID"] = self.Session.DeviceId
-	return true
-}
-
-func (self *WxWeb) webwxinit(args ...interface{}) bool {
-	url := fmt.Sprintf("%s/webwxinit?passTicket=%s&skey=%s&r=%s",
-		self.Session.BaseUri, self.Session.PassTicket, self.Session.SKey, self._unixStr())
-	params := make(map[string]interface{})
-	params["BaseRequest"] = self.Session.BaseRequest
-	res, err := self._post(url, params, true)
-	if err != nil {
-		return false
-	}
-
-	dataJson := JsonDecode(res)
-	if dataJson == nil {
-		return false
-	}
-	data := dataJson.(map[string]interface{})
-	self.Session.User = data["User"].(map[string]interface{})
-	nickName, ok := self.Session.User["NickName"]
-	if ok {
-		nick := nickName.(string)
-		self.Session.MyNickName = nick
-	}
-	userName, ok := self.Session.User["UserName"]
-	if ok {
-		myUserName := userName.(string)
-		self.Session.MyUserName = myUserName
-	}
-	self.Session.SyncKey = data["SyncKey"].(map[string]interface{})
-	self._setsynckey()
-
-	retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
-	if retCode != WX_RET_SUCCESS {
-		return false
-	}
-	chatSet := data["ChatSet"].(string)
-	chats := strings.Split(chatSet, ",")
-	for _, v := range chats {
-		if strings.HasPrefix(v, GROUP_PREFIX) {
-			ug := NewUserGroup(0, "", v, self)
-			self.Contact.Groups[v] = ug
-		}
-	}
-	logrus.Debugf("webwxinit get group num: %d", len(self.Contact.Groups))
-
-	return true
 }
 
 func (self *WxWeb) _setsynckey() {
@@ -607,50 +397,6 @@ func (self *WxWeb) synccheck() (string, string) {
 	}
 }
 
-func (self *WxWeb) testsynccheck(args ...interface{}) bool {
-	SyncHost := []string{
-		"webpush.weixin.qq.com",
-		"webpush2.weixin.qq.com",
-		"webpush.wechat.com",
-		"webpush1.wechat.com",
-		"webpush2.wechat.com",
-		"webpush1.wechatapp.com",
-		//"webpush.wechatapp.com"
-	}
-	for _, host := range SyncHost {
-		self.Session.SyncHost = host
-		retcode, _ := self.synccheck()
-		if retcode == "0" {
-			self.ifTestSyncOK = true
-			return true
-		}
-	}
-	return false
-}
-
-func (self *WxWeb) webwxstatusnotify(args ...interface{}) bool {
-	urlstr := fmt.Sprintf("%s/webwxstatusnotify?lang=zh_CN&passTicket=%s",
-		self.Session.BaseUri, self.Session.PassTicket)
-	params := make(map[string]interface{})
-	params["BaseRequest"] = self.Session.BaseRequest
-	params["Code"] = 3
-	params["FromUserName"] = self.Session.User["UserName"]
-	params["ToUserName"] = self.Session.User["UserName"]
-	params["ClientMsgId"] = int(time.Now().Unix())
-	res, err := self._post(urlstr, params, true)
-	if err != nil {
-		return false
-	}
-	return CheckWebwxRetcode(res)
-	//dataJson := JsonDecode(res)
-	//if dataJson == nil {
-	//	return false
-	//}
-	//data := dataJson.(map[string]interface{})
-	//retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
-	//return retCode == 0
-}
-
 func (self *WxWeb) webwxstatusnotifyMsgRead(toUserName string) bool {
 	//now := time.Now().Unix()
 	//if now-self.msgReadTimestamp < 17 {
@@ -673,6 +419,7 @@ func (self *WxWeb) webwxstatusnotifyMsgRead(toUserName string) bool {
 	return CheckWebwxRetcode(res)
 }
 
+// 获取通讯录
 func (self *WxWeb) webwxgetcontact(args ...interface{}) bool {
 	maxTime := 0
 	seq := 0
@@ -757,7 +504,10 @@ func (self *WxWeb) webwxgetcontact(args ...interface{}) bool {
 				_, ok := self.Contact.NickFriends[realName]
 				if ok {
 					realName = fmt.Sprintf("%s_$_%d", realName, time.Now().Unix())
-					self.WebwxOplog(userName, realName)
+					ok = self.WebwxOplog(userName, realName)
+					if ok {
+						logrus.Debugf("webwxgetcontact webwxoplog success.")
+					}
 					time.Sleep(time.Second)
 				}
 
@@ -865,9 +615,16 @@ func (self *WxWeb) webwxbatchgetcontact(usernameList []string) bool {
 				}
 				ug.MemberList[userName] = gui
 				ug.NickMemberList[memberNickName] = gui
+				if self.argv.IfSaveGroupMember {
+					ug.OriginalMemberList = append(ug.OriginalMemberList, gui)
+				}
 			}
 			self.Contact.Groups[userName] = ug
 			self.Contact.NickGroups[nickName] = ug
+			// save group member
+			if self.argv.IfSaveGroupMember {
+				self.agml.AddGroup(userName)
+			}
 			// check if save groups
 			if self.argv.IfSaveRobotGroups {
 				if nickName != "" {
@@ -899,7 +656,10 @@ func (self *WxWeb) webwxbatchgetcontact(usernameList []string) bool {
 			_, ok := self.Contact.NickFriends[realName]
 			if ok {
 				realName = fmt.Sprintf("%s_$_%d", realName, time.Now().Unix())
-				self.WebwxOplog(userName, realName)
+				ok = self.WebwxOplog(userName, realName)
+				if ok {
+					logrus.Debugf("webwxbatchgetcontact webwxoplog success.")
+				}
 				time.Sleep(time.Second)
 			}
 
@@ -1010,8 +770,14 @@ func (self *WxWeb) GroupWebwxbatchgetcontact(args ...interface{}) bool {
 					}
 					gv.MemberList[userName] = gui
 					gv.NickMemberList[nickName] = gui
+					if self.argv.IfSaveGroupMember {
+						gv.OriginalMemberList = append(gv.OriginalMemberList, gui)
+					}
 					gv.NickName = groupNickName
 					gv.ContactFlag = groupContactFlag
+				}
+				if self.argv.IfSaveGroupMember {
+					self.agml.AddGroup(groupUserName)
 				}
 				gv := self.Contact.Groups[groupUserName]
 				if gv != nil {
@@ -1091,8 +857,14 @@ func (self *WxWeb) GroupWebwxbatchgetcontact(args ...interface{}) bool {
 				}
 				gv.MemberList[userName] = gui
 				gv.NickMemberList[nickName] = gui
+				if self.argv.IfSaveGroupMember {
+					gv.OriginalMemberList = append(gv.OriginalMemberList, gui)
+				}
 				gv.NickName = groupNickName
 				gv.ContactFlag = groupContactFlag
+			}
+			if self.argv.IfSaveGroupMember {
+				self.agml.AddGroup(groupUserName)
 			}
 			gv := self.Contact.Groups[groupUserName]
 			if gv != nil {
@@ -1198,7 +970,7 @@ func (self *WxWeb) webwxsync() interface{} {
 		return false
 	}
 	if res == "" {
-		logrus.Errorf("webwxsync res == nil")
+		logrus.Errorf("[%s] webwxsync res == nil", self.Session.MyNickName)
 		return nil
 	}
 	dataJson := JsonDecode(res)
@@ -1215,6 +987,7 @@ func (self *WxWeb) webwxsync() interface{} {
 	return data
 }
 
+// 确认好友申请
 func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, nickName string) (string, bool) {
 	urlstr := fmt.Sprintf("%s/webwxverifyuser?r=%s&lang=zh_CN&pass_ticket=%s",
 		self.Session.BaseUri, self._unixStr(), self.Session.PassTicket)
@@ -1240,6 +1013,7 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 			if !ok {
 				logrus.Errorf("nick[%s] webwxoplog realname[%s] error", nickName, realNickName)
 			} else {
+				logrus.Debugf("webwxgetcontact webwxoplog success.")
 				realName = realNickName
 			}
 			return realName, true
@@ -1248,6 +1022,7 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 	}
 }
 
+// 加好友
 func (self *WxWeb) WebwxverifyuserAdd(opcode int, verifyContent, userName string) bool {
 	urlstr := fmt.Sprintf("%s/webwxverifyuser?r=%s", self.Session.BaseUri, self._unixStr())
 	params := make(map[string]interface{})
@@ -1272,6 +1047,7 @@ func (self *WxWeb) WebwxverifyuserAdd(opcode int, verifyContent, userName string
 	}
 }
 
+// 上传图片
 func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) {
 	now := time.Now().Unix()
 
@@ -1402,6 +1178,7 @@ func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) 
 	return "", false
 }
 
+// 发送图片
 func (self *WxWeb) Webwxsendmsgimg(toUserName, mediaId string) bool {
 	urlstr := fmt.Sprintf("%s/webwxsendmsgimg?fun=async&f=json&lang=zh_CN&pass_ticket=%s",
 		self.Session.BaseUri, self.Session.PassTicket)
@@ -1430,6 +1207,7 @@ func (self *WxWeb) Webwxsendmsgimg(toUserName, mediaId string) bool {
 	return false
 }
 
+// 发送消息
 func (self *WxWeb) Webwxsendmsg(message string, toUserName string) bool {
 	urlstr := fmt.Sprintf("%s/webwxsendmsg?pass_ticket=%s", self.Session.BaseUri, self.Session.PassTicket)
 	clientMsgId := self._unixStr() + "0" + strconv.Itoa(rand.Int())[3:6]
@@ -1487,6 +1265,7 @@ func (self *WxWeb) WebwxsendmsgOfShare(message string, toUserName string) bool {
 	return false
 }
 
+// 群聊邀请好友
 func (self *WxWeb) WebwxupdatechatroomInvitemember(groupUserName string, userNames []string) (string, bool) {
 	urlstr := fmt.Sprintf("%s/webwxupdatechatroom?fun=invitemember&pass_ticket=%s",
 		self.Session.BaseUri, self.Session.PassTicket)
@@ -1504,6 +1283,7 @@ func (self *WxWeb) WebwxupdatechatroomInvitemember(groupUserName string, userNam
 	}
 }
 
+// 修改群名
 func (self *WxWeb) WebwxupdatechatroomModTopic(groupUserName, newTopic string) bool {
 	urlstr := fmt.Sprintf("%s/webwxupdatechatroom?fun=modtopic",
 		self.Session.BaseUri)
@@ -1525,6 +1305,7 @@ func (self *WxWeb) WebwxupdatechatroomModTopic(groupUserName, newTopic string) b
 	return false
 }
 
+// 修改备注
 func (self *WxWeb) WebwxOplog(username string, remark string) bool {
 	urlstr := fmt.Sprintf("%s/webwxoplog", self.Session.BaseUri)
 	params := make(map[string]interface{})
@@ -1567,6 +1348,7 @@ func (self *WxWeb) DelMemberWebwxupdatechatroom(groupUsername string, username s
 	return false
 }
 
+// 创建群聊
 func (self *WxWeb) webwxcreatechatroom(usernameList []string, topic string) (string, bool) {
 	urlstr := fmt.Sprintf("%s/webwxcreatechatroom?r=%s", self.Session.BaseUri, self._unixStr())
 	params := make(map[string]interface{})
@@ -1586,145 +1368,6 @@ func (self *WxWeb) webwxcreatechatroom(usernameList []string, topic string) (str
 		return "", false
 	} else {
 		return data, true
-	}
-}
-
-func (self *WxWeb) _init() {
-	logrus.SetLevel(logrus.DebugLevel)
-
-	gCookieJar, _ := cookiejar.New(nil)
-	httpclient := http.Client{
-		CheckRedirect: nil,
-		Jar:           gCookieJar,
-	}
-	self.httpClient = &httpclient
-	rand.Seed(time.Now().Unix())
-	str := strconv.Itoa(rand.Int())
-	self.Session.DeviceId = "e" + str[2:17]
-	self.Contact = NewUserContact(self)
-}
-
-func (self *WxWeb) Start() {
-	if self.argv == nil {
-		self.argv = &StartWxArgv{IfInvite: true, IfInviteEndExit: true, InviteMsg: self.cfg.InviteMsg}
-	}
-
-	self.startTime = time.Now().Unix()
-
-	self.Lock()
-	self.enable = true
-	self.Unlock()
-
-	logrus.Info("[*] 微信网页版 ... 开动")
-	self._init()
-	self._run("[*] 正在获取 uuid ... ", self.getUuid)
-	self._run("[*] 正在获取 二维码 ... ", self.genQRcode)
-	logrus.Infof("[*] 请使用微信扫描二维码以登录 ... uuid[%s]", self.Session.Uuid)
-}
-
-func (self *WxWeb) Run() {
-	for {
-		if !self.enable {
-			close(self.stopped)
-			return
-		}
-		if self.waitForLogin(1) == false {
-			continue
-		}
-		logrus.Infof("[*] 请在手机上点击确认以登录 ... ")
-		if self.waitForLogin(0) == false {
-			continue
-		}
-		break
-	}
-	self._run("[*] 正在登录 ... ", self.login)
-	self._run("[*] 微信初始化 ... ", self.webwxinit)
-	self._run("[*] 开启状态通知 ... ", self.webwxstatusnotify)
-	self._run("[*] 进行同步线路测试 ... ", self.testsynccheck)
-	self._run("[*] 获取好友列表 ... ", self.webwxgetcontact)
-	self._run("[*] 获取群列表 ... ", self.GroupWebwxbatchgetcontact)
-	//go self.Contact.InviteMembersPic()
-	if self.argv.IfInvite {
-		go self.Contact.InviteMembers()
-	}
-	if self.argv.IfClearWx {
-		go self.Contact.ClearWx()
-	}
-	if self.argv.IfSaveRobotFriends {
-		go self.Contact.SaveRobotFriends()
-	}
-	if self.argv.IfSaveRobotGroups {
-		go self.Contact.SaveRobotGroups()
-	}
-	if self.argv.IfCreateGroup {
-		go self.Contact.CreateGroups()
-	}
-
-	//self.testUploadMedia()
-	//self.Contact.PrintGroupInfo()
-	//self.Contact.GroupMass()
-
-	self.Lock()
-	self.ifLogin = true
-	self.Unlock()
-	self.wxh.Login(self.Session.Uuid)
-	for {
-		if !self.enable {
-			self.Lock()
-			self.ifLogout = true
-			self.Unlock()
-			self.wxh.Logout(self.Session.Uuid)
-			close(self.stopped)
-			return
-		}
-
-		retcode, selector := self.synccheck()
-		//logrus.Debugf("sync check recode: %s selector: %s", retcode, selector)
-		if retcode == "1100" {
-			logrus.Infof("[*] user[%v] 你在手机上登出了微信, 88", self.Session.User)
-			self.Lock()
-			self.ifLogout = true
-			self.Unlock()
-			self.wxh.Logout(self.Session.Uuid)
-			break
-		} else if retcode == "1101" {
-			logrus.Infof("[*] user[%v] 你在其他地方登录了 WEB 版微信, 88", self.Session.User)
-			self.Lock()
-			self.ifLogout = true
-			self.Unlock()
-			self.wxh.Logout(self.Session.Uuid)
-			break
-		} else if retcode == "0" {
-			// selector: 2 普通消息 6 用户同意好友申请 4 通讯录变更
-			if selector == "2" || selector == "6" {
-				r := self.webwxsync()
-				if r == nil {
-					time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-					continue
-				}
-				//logrus.Debugf("webwxsync: %v", r)
-				switch r.(type) {
-				case bool:
-				default:
-					self.handleMsg(r)
-				}
-				time.Sleep(WEBWX_HANDLE_MSG_SYNC_INTERVAL * time.Second)
-			} else if selector == "0" {
-				time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-			} else if selector == "4" {
-				self.webwxsync()
-				time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-			} else if selector == "7" {
-				self.webwxsync()
-				time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-			} else if selector == "3" {
-				self.webwxsync()
-				time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-			} else {
-				self.webwxsync()
-				time.Sleep(WEBWX_SYNC_INTERVAL * time.Second)
-			}
-		}
 	}
 }
 
