@@ -4,13 +4,11 @@ package wxweb
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math"
 	"math/rand"
 	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -23,6 +21,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	z "github.com/nutzam/zgo"
 	"github.com/reechou/wxrobot/config"
+	"gopkg.in/h2non/filetype.v1"
 )
 
 const debug = false
@@ -226,6 +225,10 @@ func (self *WxWeb) StartTime() int64 {
 	return self.startTime
 }
 
+func (self *WxWeb) RobotType() int {
+	return self.argv.RobotType
+}
+
 func (self *WxWeb) _postFile(urlstr string, req *bytes.Buffer) (string, error) {
 	var err error
 	var resp *http.Response
@@ -317,11 +320,6 @@ func (self *WxWeb) _get(urlstr string, jsonFmt bool) (string, error) {
 		return "", err
 	}
 
-	//fmt.Println(request.URL.Host)
-	//for _, v := range self.httpClient.Jar.Cookies(request.URL) {
-	//	fmt.Println(v.String())
-	//}
-
 	request.Header.Add("Referer", "https://wx.qq.com")
 	request.Header.Add("User-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36")
 	if self.cookies != nil {
@@ -397,13 +395,8 @@ func (self *WxWeb) synccheck() (string, string) {
 	}
 }
 
+// 点掉红点
 func (self *WxWeb) webwxstatusnotifyMsgRead(toUserName string) bool {
-	//now := time.Now().Unix()
-	//if now-self.msgReadTimestamp < 17 {
-	//	return true
-	//}
-	//self.msgReadTimestamp = now
-
 	urlstr := fmt.Sprintf("%s/webwxstatusnotify", self.Session.BaseUri)
 	params := make(map[string]interface{})
 	params["BaseRequest"] = self.Session.BaseRequest
@@ -503,7 +496,7 @@ func (self *WxWeb) webwxgetcontact(args ...interface{}) bool {
 
 				_, ok := self.Contact.NickFriends[realName]
 				if ok {
-					realName = fmt.Sprintf("%s_$_%d", realName, time.Now().Unix())
+					realName = fmt.Sprintf("%s__%s", realName, time.Now().Format("20060102_15:04"))
 					ok = self.WebwxOplog(userName, realName)
 					if ok {
 						logrus.Debugf("webwxgetcontact webwxoplog success.")
@@ -557,19 +550,14 @@ func (self *WxWeb) webwxbatchgetcontact(usernameList []string) bool {
 		logrus.Errorf("webwxbatchgetcontact _post error: %v", err)
 		return false
 	}
-	dataJson := JsonDecode(res)
-	if dataJson == nil {
-		logrus.Errorf("json decode error.")
+	data, ok := CheckWebwxResData(res)
+	if !ok {
+		logrus.Errorf("webwxbatchgetcontact translate data error.")
 		return false
 	}
-	data := dataJson.(map[string]interface{})
-	if data == nil {
-		logrus.Errorf("webwxbatchgetcontact translate map error: %v", err)
-		return false
-	}
-	retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
-	if retCode != WX_RET_SUCCESS {
-		logrus.Errorf("webwxbatchgetcontact get error retcode[%d]", retCode)
+	ok = CheckWebwxRetcodeFromData(data)
+	if !ok {
+		logrus.Errorf("webwxbatchgetcontact get error retcode.")
 		return false
 	}
 	contactList := data["ContactList"].([]interface{})
@@ -601,7 +589,6 @@ func (self *WxWeb) webwxbatchgetcontact(usernameList []string) bool {
 					logrus.Errorf("webwxbatchgetcontact get member[%v] error", v2)
 					continue
 				}
-				//logrus.Debugf("%s member: %v", nickName, member)
 				displayName := member["DisplayName"].(string)
 				memberNickName := member["NickName"].(string)
 				if !self.argv.IfNotReplaceEmoji {
@@ -655,7 +642,7 @@ func (self *WxWeb) webwxbatchgetcontact(usernameList []string) bool {
 			}
 			_, ok := self.Contact.NickFriends[realName]
 			if ok {
-				realName = fmt.Sprintf("%s_$_%d", realName, time.Now().Unix())
+				realName = fmt.Sprintf("%s__%s", realName, time.Now().Format("20060102_15:04"))
 				ok = self.WebwxOplog(userName, realName)
 				if ok {
 					logrus.Debugf("webwxbatchgetcontact webwxoplog success.")
@@ -973,17 +960,33 @@ func (self *WxWeb) webwxsync() interface{} {
 		logrus.Errorf("[%s] webwxsync res == nil", self.Session.MyNickName)
 		return nil
 	}
-	dataJson := JsonDecode(res)
-	if dataJson == nil {
+
+	data, ok := CheckWebwxResData(res)
+	if !ok {
 		logrus.Errorf("webwxsync JsonDecode(res[%s]) == nil", res)
 		return nil
 	}
-	data := dataJson.(map[string]interface{})
-	retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
-	if retCode == 0 {
-		self.Session.SyncKey = data["SyncKey"].(map[string]interface{})
-		self._setsynckey()
+	ok = CheckWebwxRetcodeFromData(data)
+	if !ok {
+		logrus.Errorf("webwxsync result retcode not ok.")
+		return nil
 	}
+
+	self.Session.SyncKey = data["SyncKey"].(map[string]interface{})
+	self._setsynckey()
+
+	//dataJson := JsonDecode(res)
+	//if dataJson == nil {
+	//	logrus.Errorf("webwxsync JsonDecode(res[%s]) == nil", res)
+	//	return nil
+	//}
+	//data := dataJson.(map[string]interface{})
+	//retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
+	//if retCode == 0 {
+	//	self.Session.SyncKey = data["SyncKey"].(map[string]interface{})
+	//	self._setsynckey()
+	//}
+
 	return data
 }
 
@@ -1008,7 +1011,7 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 		logrus.Debugf("webwxverifyuser[%s] usrname[%s] get data[%s].", urlstr, userName, data)
 		if CheckWebwxRetcode(data) {
 			realName := nickName
-			realNickName := fmt.Sprintf("%s_$_%s_$_%s", nickName, self.Session.MyNickName, time.Now().Format("20060102_15:04"))
+			realNickName := fmt.Sprintf("%s__%s", nickName, time.Now().Format("20060102_15:04"))
 			ok := self.WebwxOplog(userName, realNickName)
 			if !ok {
 				logrus.Errorf("nick[%s] webwxoplog realname[%s] error", nickName, realNickName)
@@ -1047,7 +1050,7 @@ func (self *WxWeb) WebwxverifyuserAdd(opcode int, verifyContent, userName string
 	}
 }
 
-// 上传图片
+// 上传资源
 func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) {
 	now := time.Now().Unix()
 
@@ -1063,11 +1066,23 @@ func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) 
 	}
 	self.imgMediaMutex.Unlock()
 
-	// 图片类型
-	typef := z.FileType(filePath)
-	logrus.Debugf("file type: %s", typef)
-	if typef == "jpg" {
-		typef = "jpeg"
+	// 资源类型
+	buf, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return "", false
+	}
+	kind, err := filetype.Get(buf)
+	if err != nil {
+		return "", false
+	}
+	head := buf[:261]
+	var mediatype string
+	if filetype.IsImage(head) {
+		mediatype = `pic`
+	} else if filetype.IsVideo(head) {
+		mediatype = `video`
+	} else {
+		mediatype = `doc`
 	}
 
 	_, file := filepath.Split(filePath)
@@ -1094,33 +1109,19 @@ func (self *WxWeb) Webwxuploadmedia(toUserName, filePath string) (string, bool) 
 	var multipartResult bytes.Buffer
 	multipartWriter := multipart.NewWriter(&multipartResult)
 	multipartWriter.SetBoundary("------WebKitFormBoundaryiqkEFAw82yzyl51B")
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Disposition",
-		fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-			strings.NewReplacer("\\", "\\\\", `"`, "\\\"").Replace("filename"), strings.NewReplacer("\\", "\\\\", `"`, "\\\"").Replace(file)))
-	h.Set("Content-Type", "image/"+typef)
-	fileWriter, err := multipartWriter.CreatePart(h)
+	fileWriter, err := multipartWriter.CreateFormFile("filename", file)
 	if err != nil {
 		logrus.Error("Create form file error: ", err)
 		return "", false
 	}
-	fh, err := os.Open(filePath)
-	if err != nil {
-		logrus.Error("error opening file")
-		return "", false
-	}
-	defer fh.Close()
-	_, err = io.Copy(fileWriter, fh)
-	if err != nil {
-		logrus.Errorf("io copy error: %v", err)
-		return "", false
-	}
+	fileWriter.Write(buf)
+	
 	multipartWriter.WriteField("id", fmt.Sprintf("WU_FILE_%d", self.Session.MediaCount))
 	multipartWriter.WriteField("name", file)
-	multipartWriter.WriteField("type", "image/"+typef)
-	multipartWriter.WriteField("lastModifiedDate", time.Now().Format("Mon Jan _2 2006 15:04:05 GMT+0800 (CST)"))
+	multipartWriter.WriteField("type", kind.MIME.Value)
+	multipartWriter.WriteField("lastModifiedDate", fileInfo.ModTime().UTC().String())
 	multipartWriter.WriteField("size", strconv.Itoa(int(fileSize)))
-	multipartWriter.WriteField("mediatype", "pic")
+	multipartWriter.WriteField("mediatype", mediatype)
 	multipartWriter.WriteField("uploadmediarequest", uploadmediarequestStr)
 	for _, v := range self.cookies {
 		if v.Name == "webwx_data_ticket" {
@@ -1195,14 +1196,44 @@ func (self *WxWeb) Webwxsendmsgimg(toUserName, mediaId string) bool {
 	params["Msg"] = msg
 	data, err := self._post(urlstr, params, true)
 	if err != nil {
-		logrus.Errorf("wx[%s] send mediaId[%s] toUserName[%s] error: %s", self.Session.MyNickName, mediaId, toUserName, err)
+		logrus.Errorf("wx[%s] send img mediaId[%s] toUserName[%s] error: %s", self.Session.MyNickName, mediaId, toUserName, err)
 		return false
 	} else {
 		if CheckWebwxRetcode(data) {
 			logrus.Debugf("wx[%s] send img toUserName[%s] success.", self.Session.MyNickName, toUserName)
 			return true
 		}
-		logrus.Errorf("wx send msg img error.")
+		logrus.Errorf("wx[%s] send msg img error.", self.Session.MyNickName)
+	}
+	return false
+}
+
+// 发送视频
+func (self *WxWeb) Webwxsendvideomsg(toUserName, mediaId string) bool {
+	urlstr := fmt.Sprintf("%s/webwxsendvideomsg?fun=async&f=json",
+		self.Session.BaseUri)
+	clientMsgId := self._unixStr() + "0" + strconv.Itoa(rand.Int())[3:6]
+	params := make(map[string]interface{})
+	params["BaseRequest"] = self.Session.BaseRequest
+	msg := make(map[string]interface{})
+	msg["Type"] = 43
+	msg["MediaId"] = mediaId
+	msg["FromUserName"] = self.Session.User["UserName"]
+	msg["ToUserName"] = toUserName
+	msg["LocalID"] = clientMsgId
+	msg["ClientMsgId"] = clientMsgId
+	params["Msg"] = msg
+	params["Scene"] = 0
+	data, err := self._post(urlstr, params, true)
+	if err != nil {
+		logrus.Errorf("wx[%s] send video mediaId[%s] toUserName[%s] error: %s", self.Session.MyNickName, mediaId, toUserName, err)
+		return false
+	} else {
+		if CheckWebwxRetcode(data) {
+			logrus.Debugf("wx[%s] send video toUserName[%s] success.", self.Session.MyNickName, toUserName)
+			return true
+		}
+		logrus.Errorf("wx[%s] send msg video error.", self.Session.MyNickName)
 	}
 	return false
 }
@@ -1372,14 +1403,15 @@ func (self *WxWeb) webwxcreatechatroom(usernameList []string, topic string) (str
 }
 
 func (self *WxWeb) testUploadMedia() {
-	self.WebwxsendmsgOfShare("xxxx", self.TestUserName)
+	//self.WebwxsendmsgOfShare("xxxx", self.TestUserName)
 
-	//mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
-	//if ok {
-	//	self.Webwxsendmsgimg(self.TestUserName, mediaId)
-	//	//time.Sleep(time.Hour)
-	//	//self.Webwxsendmsgimg(self.TestUserName, mediaId)
-	//
-	//	self.Webwxsendmsg("xxxxx", self.TestUserName)
-	//}
+	mediaId, ok := self.Webwxuploadmedia(self.TestUserName, self.cfg.UploadFile)
+	if ok {
+		self.Webwxsendvideomsg(self.TestUserName, mediaId)
+		//self.Webwxsendmsgimg(self.TestUserName, mediaId)
+		//time.Sleep(time.Hour)
+		//self.Webwxsendmsgimg(self.TestUserName, mediaId)
+
+		self.Webwxsendmsg("xxxxx", self.TestUserName)
+	}
 }

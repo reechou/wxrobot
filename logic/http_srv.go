@@ -49,6 +49,7 @@ func (self *WxHttpSrv) registerHandlers() {
 
 	self.httpSrv.Route("/reloadevent", self.httpWrap(self.ReloadEvent))
 	self.httpSrv.Route("/allrobots", self.httpWrap(self.AllRobots))
+	self.httpSrv.Route("/robots_from_type", self.httpWrap(self.LoginRobotsFromType))
 }
 
 func (self *WxHttpSrv) httpWrap(handler HttpHandler) func(rsp http.ResponseWriter, req *http.Request) {

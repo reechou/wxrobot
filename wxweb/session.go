@@ -15,20 +15,30 @@ func (self *WxWeb) parseSessionCache(robot *models.Robot) bool {
 		logrus.Debugf("cannot found robot session baselogininfo or cookie.")
 		return false
 	}
-	
+
 	var cookieInterfaces []interface{}
 	err := json.Unmarshal([]byte(robot.WebwxCookie), &cookieInterfaces)
 	if err != nil {
 		logrus.Errorf("json unmarshal cookie error: %v", err)
 		return false
 	}
-	
+
 	err = json.Unmarshal([]byte(robot.BaseLoginInfo), &self.Session)
 	if err != nil {
 		logrus.Errorf("json unmarshal base login info error: %v", err)
 		return false
 	}
-	
+	logrus.Debugf("parse baselogin info session success: %v", self.Session)
+
+	if robot.Argv != "" {
+		err = json.Unmarshal([]byte(robot.Argv), &self.argv)
+		if err != nil {
+			logrus.Errorf("json unmarshal argv error: %v", err)
+			return false
+		}
+		logrus.Debugf("parse robot argv session success: %v", self.argv)
+	}
+
 	var cookies []*http.Cookie
 	for _, c := range cookieInterfaces {
 		b, _ := json.Marshal(c)
@@ -48,8 +58,7 @@ func (self *WxWeb) parseSessionCache(robot *models.Robot) bool {
 	if uin, ok := self.Session.BaseRequest["Uin"].(float64); ok {
 		self.Session.BaseRequest["Uin"] = int64(uin)
 	}
-	logrus.Debugf("parse session success: %v", self.Session)
-	
+
 	return true
 }
 
@@ -90,7 +99,7 @@ func (self *WxWeb) checkSession(cookies []*http.Cookie) {
 	if len(cookies) == 0 || self.Session.MyNickName == "" {
 		return
 	}
-	
+
 	//self.refreshSessionCache(cookies)
 	now := time.Now().Unix()
 	if now-self.lastSaveCookieTime > 60 {
@@ -138,4 +147,38 @@ func (self *WxWeb) refreshSessionCache(cookies []*http.Cookie) {
 		}
 	}
 	logrus.Debugf("[%s] refresh session and cookie cache success.", self.Session.MyNickName)
+}
+
+func (self *WxWeb) refreshRobotArgv() {
+	argvCache, err := json.Marshal(self.argv)
+	if err != nil {
+		logrus.Errorf("refresh json marshal robot argv error: %v", err)
+		return
+	}
+	robot := &models.Robot{
+		RobotWx: self.Session.MyNickName,
+	}
+	has, err := models.GetRobot(robot)
+	if err != nil {
+		logrus.Errorf("get robot error: %v", err)
+		return
+	}
+	robot.RobotType = self.argv.RobotType
+	robot.Ip = HostIP
+	robot.OfPort = self.cfg.Host
+	robot.Argv = string(argvCache)
+	if has {
+		err = models.UpdateRobotArgv(robot)
+		if err != nil {
+			logrus.Errorf("update robot argv session error: %v", err)
+			return
+		}
+	} else {
+		err = models.CreateRobot(robot)
+		if err != nil {
+			logrus.Errorf("create robot error: %v", err)
+			return
+		}
+	}
+	logrus.Debugf("[%s] refresh robot argv cache success.", self.Session.MyNickName)
 }

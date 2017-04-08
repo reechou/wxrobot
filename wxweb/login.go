@@ -1,28 +1,30 @@
 package wxweb
 
 import (
-	"fmt"
+	"bytes"
 	"crypto/tls"
+	"encoding/xml"
+	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"strconv"
-	"time"
-	"regexp"
 	"os"
 	"os/exec"
-	"io"
-	"bytes"
+	"regexp"
 	"runtime"
-	"encoding/xml"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/models"
 )
 
 type StartWxArgv struct {
+	RobotType int `json:"robotType"`
+
 	IfInvite           bool   `json:"ifInvite,omitempty"`
 	IfInviteEndExit    bool   `json:"inviteEndExit,omitempty"`
 	InviteMsg          string `json:"inviteMsg,omitempty"`
@@ -220,7 +222,7 @@ func (self *WxWeb) login(args ...interface{}) bool {
 	self.Session.BaseRequest["Sid"] = v.Wxsid
 	self.Session.BaseRequest["Skey"] = v.Skey
 	self.Session.BaseRequest["DeviceID"] = self.Session.DeviceId
-	
+
 	return true
 }
 
@@ -228,23 +230,23 @@ func (self *WxWeb) Resume(robot *models.Robot) bool {
 	if self.argv == nil {
 		self.argv = &StartWxArgv{}
 	}
-	
+
 	self.startTime = time.Now().Unix()
-	
+
 	self.Lock()
 	self.enable = true
 	self.Unlock()
-	
+
 	// 初始化
 	self._init()
-	
+
 	ok := self.quickLogin(robot)
 	if !ok {
 		logrus.Debugf("resume robot[%s] quick login failed", robot.RobotWx)
 		return false
 	}
 	go self.wechatLoop()
-	
+
 	return true
 }
 
@@ -261,7 +263,7 @@ func (self *WxWeb) Start() {
 
 	// 初始化
 	self._init()
-	
+
 	logrus.Info("[*] 开启微信网页版 ...")
 	self._run("[*] 正在获取 uuid ... ", self.getUuid)
 	self._run("[*] 正在获取 二维码 ... ", self.genQRcode)
@@ -310,7 +312,8 @@ func (self *WxWeb) Run() {
 		return
 	}
 	self.wxh.Login(self.Session.Uuid)
-	
+	self.refreshRobotArgv()
+
 	self.wechatLoop()
 }
 
@@ -354,11 +357,11 @@ func (self *WxWeb) wechatLoop() {
 	if self.argv.IfCreateGroup {
 		go self.Contact.CreateGroups()
 	}
-	
+
 	//self.testUploadMedia()
 	//self.Contact.PrintGroupInfo()
 	//self.Contact.GroupMass()
-	
+
 	self.Lock()
 	self.ifLogin = true
 	self.Unlock()
@@ -371,7 +374,7 @@ func (self *WxWeb) wechatLoop() {
 			close(self.stopped)
 			return
 		}
-		
+
 		retcode, selector := self.synccheck()
 		//logrus.Debugf("sync check recode: %s selector: %s", retcode, selector)
 		if retcode == "1100" {

@@ -9,6 +9,8 @@ const (
 	MSG_TYPE_VERIFY_USER = 37
 	MSG_TYPE_VIDEO       = 43
 	MSG_TYPE_VOICE       = 34
+	MSG_TYPE_CARD        = 42
+	MSG_TYPE_SHARE_URL   = 49
 )
 
 const (
@@ -46,21 +48,27 @@ const (
 	RECEIVE_MSG_TYPE_IMG   = "img"
 	RECEIVE_MSG_TYPE_VOICE = "voice"
 	RECEIVE_MSG_TYPE_VIDEO = "video"
+	RECEIVE_MSG_TYPE_CARD  = "card"
+	RECEIVE_MSG_TYPE_SHARE = "shareurl"
 )
 
 type msgUrlHandle func(string) string
 
 var (
 	RECEIVE_MSG_MAP = map[int]string{
-		MSG_TYPE_TEXT:  RECEIVE_MSG_TYPE_TEXT,
-		MSG_TYPE_IMG:   RECEIVE_MSG_TYPE_IMG,
-		MSG_TYPE_VOICE: RECEIVE_MSG_TYPE_VOICE,
-		MSG_TYPE_VIDEO: RECEIVE_MSG_TYPE_VIDEO,
+		MSG_TYPE_TEXT:      RECEIVE_MSG_TYPE_TEXT,
+		MSG_TYPE_IMG:       RECEIVE_MSG_TYPE_IMG,
+		MSG_TYPE_VOICE:     RECEIVE_MSG_TYPE_VOICE,
+		MSG_TYPE_VIDEO:     RECEIVE_MSG_TYPE_VIDEO,
+		MSG_TYPE_CARD:      RECEIVE_MSG_TYPE_CARD,
+		MSG_TYPE_SHARE_URL: RECEIVE_MSG_TYPE_SHARE,
 	}
 	RECEIVE_MSG_CONTENT_MAP = map[int]string{
-		MSG_TYPE_IMG:   "收到一张图片,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
-		MSG_TYPE_VOICE: "收到一段语音,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
-		MSG_TYPE_VIDEO: "收到一段视频,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
+		MSG_TYPE_IMG:       "收到一张图片,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
+		MSG_TYPE_VOICE:     "收到一段语音,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
+		MSG_TYPE_VIDEO:     "收到一段视频,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
+		MSG_TYPE_CARD:      "收到分享名片",
+		MSG_TYPE_SHARE_URL: "收到分享链接",
 	}
 )
 

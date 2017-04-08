@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -36,7 +36,7 @@ func (self *WxWeb) webwxinit(args ...interface{}) bool {
 	}
 	self.Session.SyncKey = data["SyncKey"].(map[string]interface{})
 	self._setsynckey()
-	
+
 	retCode := data["BaseResponse"].(map[string]interface{})["Ret"].(int)
 	if retCode != WX_RET_SUCCESS {
 		return false
@@ -50,7 +50,7 @@ func (self *WxWeb) webwxinit(args ...interface{}) bool {
 		}
 	}
 	logrus.Debugf("webwxinit get group num: %d", len(self.Contact.Groups))
-	
+
 	return true
 }
 
@@ -67,7 +67,7 @@ func (self *WxWeb) webwxstatusnotify(args ...interface{}) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	return CheckWebwxRetcode(res)
 }
 

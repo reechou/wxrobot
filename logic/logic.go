@@ -1,9 +1,9 @@
 package logic
 
 import (
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/reechou/wxrobot/config"
@@ -58,7 +58,7 @@ func NewWxLogic(cfg *config.Config) *WxLogic {
 	//if err != nil {
 	//	panic(err)
 	//}
-	
+
 	go l.runCheck()
 
 	return l
@@ -74,7 +74,7 @@ func (self *WxLogic) Run() {
 }
 
 func (self *WxLogic) Resume() {
-	robotList, err := models.GetAllRobots(wxweb.HostIP)
+	robotList, err := models.GetAllRobots(wxweb.HostIP, self.cfg.Host)
 	if err != nil {
 		logrus.Errorf("resume get all robots error: %v", err)
 		return
@@ -182,6 +182,10 @@ func (self *WxLogic) RobotVerifyAddFriend(info *RobotAddFriendReq) bool {
 
 func (self *WxLogic) GetAllRobots() []RobotInfo {
 	return self.wxMgr.LoginRobots()
+}
+
+func (self *WxLogic) GetRobotsFromType(robotType int) []RobotInfo {
+	return self.wxMgr.LoginRobotsFromType(robotType)
 }
 
 // for logic wx interface

@@ -127,7 +127,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						//}
 
 						realName := userNickName
-						realNickName := fmt.Sprintf("%s_$_%s_$_%s", userNickName, self.Session.MyNickName, time.Now().Format("20060102_15:04"))
+						realNickName := fmt.Sprintf("%s__%s", userNickName, time.Now().Format("20060102_15:04"))
 						ok := self.WebwxOplog(userName, realNickName)
 						if !ok {
 							logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
@@ -199,14 +199,22 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
 		receiveMsg.BaseInfo.FromUserName = fromUserName
 		// 文本消息
-		if msgType == MSG_TYPE_TEXT || msgType == MSG_TYPE_IMG || msgType == MSG_TYPE_VOICE || msgType == MSG_TYPE_VIDEO {
+		if msgType == MSG_TYPE_TEXT ||
+			msgType == MSG_TYPE_IMG ||
+			msgType == MSG_TYPE_VOICE ||
+			msgType == MSG_TYPE_VIDEO ||
+			msgType == MSG_TYPE_CARD ||
+			msgType == MSG_TYPE_SHARE_URL {
 			//logrus.Debugf("text msg: %s", content)
 			receiveMsg.MsgType = RECEIVE_MSG_MAP[msgType]
 			if strings.Contains(content, MSG_MEDIA_KEYWORD) {
 				continue
 			}
-			if fromUserName[:2] == GROUP_PREFIX {
+			if strings.HasPrefix(fromUserName, GROUP_PREFIX) {
 				contentSlice := strings.Split(content, ":<br/>")
+				if len(contentSlice) < 2 {
+					continue
+				}
 				people := contentSlice[0]
 				content = contentSlice[1]
 				group := self.Contact.GetGroup(fromUserName)
@@ -225,9 +233,6 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					Content:  content,
 				}
 				group.AppendMsg(msg)
-
-				// 读取消息
-				//self.webwxstatusnotifyMsgRead(fromUserName)
 
 				peopleNickname := sendPeople.NickName
 				uf := self.Contact.GetFriend(people)
@@ -259,11 +264,16 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				self.webwxstatusnotifyMsgRead(receiveMsg.BaseInfo.FromUserName)
 			}
 			receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MSG
-			if msgType == MSG_TYPE_TEXT {
+			switch msgType {
+			case MSG_TYPE_TEXT:
 				receiveMsg.Msg = content
-			} else {
+			case MSG_TYPE_CARD, MSG_TYPE_SHARE_URL:
+				receiveMsg.Msg = RECEIVE_MSG_CONTENT_MAP[msgType]
+			case MSG_TYPE_IMG, MSG_TYPE_VIDEO, MSG_TYPE_VOICE:
 				receiveMsg.Msg = RECEIVE_MSG_CONTENT_MAP[msgType]
 				receiveMsg.MediaTempUrl = self.msgUrlMap[msgType](msgid)
+			default:
+				receiveMsg.Msg = "unknown msg"
 			}
 		} else if msgType == MSG_TYPE_INIT {
 			//logrus.Debug("[*] 成功截获微信初始化消息", msg)
@@ -282,14 +292,6 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			self.getBigContactList(strings.Split(statusNotifyUserNameStr, ","))
 		} else if msgType == MSG_TYPE_SYSTEM {
 			logrus.Debugf("系统消息: %s", content)
-			//if strings.Contains(content, "邀请") {
-			//	group := self.Contact.Groups[fromUserName]
-			//	if group == nil {
-			//		continue
-			//	}
-			//	//group.AppendInviteMsg(&MsgInfo{WXMsgId: msgid, Content: content})
-			//}
-
 			// 系统消息,群: 扫描, 邀请
 			if strings.Contains(content, WX_SYSTEM_MSG_INVITE) || strings.Contains(content, WX_SYSTEM_MSG_SCAN) {
 				group := self.Contact.GetGroup(fromUserName)
@@ -341,17 +343,6 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			userName := rInfo["UserName"].(string)
 			nickName := rInfo["NickName"].(string)
 
-			//logrus.Debugf("addfriend content: %s", content)
-			//var addFriendContent AddFriendContent
-			//err := xml.Unmarshal([]byte(content), &addFriendContent)
-			//if err != nil {
-			//	logrus.Errorf("add friend parse content error: %v", err)
-			//} else {
-			//	receiveMsg.AddFriend.SourceWechat = addFriendContent.SourceUsername
-			//	receiveMsg.AddFriend.SourceNick = addFriendContent.SourceNickname
-			//	receiveMsg.AddFriend.UserWechat = addFriendContent.FromUsername
-			//	receiveMsg.AddFriend.UserNick = addFriendContent.FromNickname
-			//}
 			reg := regexp.MustCompile(`alias(.*?)=(.*?)\"(.*?)\"`)
 			alias := reg.FindString(string(content))
 			alias = strings.Replace(alias, "\"", "", -1)

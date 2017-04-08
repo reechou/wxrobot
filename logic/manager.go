@@ -91,6 +91,8 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) bool {
 			return wx.Webwxsendmsg(msgStr, userName)
 		} else if msg.MsgType == MSG_TYPE_IMG {
 			return self.sendImg(userName, msgStr, wx)
+		} else if msg.MsgType == MSG_TYPE_VIDEO {
+			return self.sendVideo(userName, msgStr, wx)
 		}
 	case CHAT_TYPE_GROUP:
 		var userName string
@@ -120,6 +122,8 @@ func (self *WxManager) SendMsg(msg *SendMsgInfo, msgStr string) bool {
 			return wx.Webwxsendmsg(msgStr, userName)
 		} else if msg.MsgType == MSG_TYPE_IMG {
 			return self.sendImg(userName, msgStr, wx)
+		} else if msg.MsgType == MSG_TYPE_VIDEO {
+			return self.sendVideo(userName, msgStr, wx)
 		}
 	}
 	return false
@@ -155,6 +159,41 @@ func (self *WxManager) sendImg(userName, imgMsg string, wx *wxweb.WxWeb) bool {
 		mediaId, ok := wx.Webwxuploadmedia(userName, imgMsg)
 		if ok {
 			return wx.Webwxsendmsgimg(userName, mediaId)
+		}
+	}
+	return false
+}
+
+func (self *WxManager) sendVideo(userName, videoMsg string, wx *wxweb.WxWeb) bool {
+	if strings.HasPrefix(videoMsg, "http") {
+		logrus.Debugf("send video[%s] to username[%s]", videoMsg, userName)
+		videoPath := fmt.Sprintf("%s/%s.mp4", self.cfg.TempPicDir, fmt.Sprintf("%x", md5.Sum([]byte(videoMsg))))
+		if !PathExist(videoPath) {
+			logrus.Debugf("video[%s] not exist", videoPath)
+			res, err := http.Get(videoMsg)
+			if err != nil {
+				logrus.Errorf("http get video[%s] error: %v", videoMsg, err)
+				return false
+			}
+			out, err := os.Create(videoPath)
+			if err != nil {
+				logrus.Errorf("os create video[%s] error: %v", videoPath, err)
+				return false
+			}
+			_, err = io.Copy(out, res.Body)
+			if err != nil {
+				logrus.Errorf("io copy video[%s] error: %v", videoPath, err)
+				return false
+			}
+		}
+		mediaId, ok := wx.Webwxuploadmedia(userName, videoPath)
+		if ok {
+			return wx.Webwxsendvideomsg(userName, mediaId)
+		}
+	} else {
+		mediaId, ok := wx.Webwxuploadmedia(userName, videoMsg)
+		if ok {
+			return wx.Webwxsendvideomsg(userName, mediaId)
 		}
 	}
 	return false
@@ -309,6 +348,24 @@ func (self *WxManager) LoginRobots() []RobotInfo {
 				RobotWxNick: v.RobotWxNick(),
 				RunTime:     time.Now().Unix() - v.StartTime(),
 			})
+		}
+	}
+	return list
+}
+
+func (self *WxManager) LoginRobotsFromType(robotType int) []RobotInfo {
+	self.Lock()
+	defer self.Unlock()
+	
+	var list []RobotInfo
+	for _, v := range self.wxs {
+		if v.IfLogin() {
+			if robotType == v.RobotType() {
+				list = append(list, RobotInfo{
+					RobotWxNick: v.RobotWxNick(),
+					RunTime:     time.Now().Unix() - v.StartTime(),
+				})
+			}
 		}
 	}
 	return list

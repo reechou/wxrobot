@@ -33,8 +33,9 @@ const (
 )
 
 const (
-	MSG_TYPE_TEXT = "text"
-	MSG_TYPE_IMG  = "img"
+	MSG_TYPE_TEXT  = "text"
+	MSG_TYPE_IMG   = "img"
+	MSG_TYPE_VIDEO = "video"
 )
 
 // allevent默认不处理verifyuser消息

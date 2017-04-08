@@ -43,6 +43,7 @@ type GroupUserInfo struct {
 	DisplayName string `json:"displayName"`
 	NickName    string `json:"nickname"`
 	UserName    string `json:"username"`
+	Sex         int    `json:"sex"`
 }
 type MsgInfo struct {
 	MsgID    int
@@ -424,7 +425,7 @@ func (self *UserContact) SaveRobotGroups() {
 			if robot.IfSaveGroup != 0 {
 				logrus.Debugf("Robot[%s] group has saved.", self.wx.Session.MyNickName)
 				self.setIpPort(robot)
-				err = models.UpdateRobotSaveGroup(robot)
+				err = models.UpdateRobotHost(robot)
 				if err != nil {
 					logrus.Errorf("update robot save group error: %v", err)
 				}
@@ -478,7 +479,7 @@ func (self *UserContact) SaveRobotFriends() {
 			if robot.IfSaveFriend != 0 {
 				logrus.Debugf("Robot[%s] friend has saved.", self.wx.Session.MyNickName)
 				self.setIpPort(robot)
-				err = models.UpdateRobotSaveFriend(robot)
+				err = models.UpdateRobotHost(robot)
 				if err != nil {
 					logrus.Errorf("update robot save error: %v", err)
 				}

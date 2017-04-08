@@ -43,6 +43,10 @@ type RobotAddFriendReq struct {
 	VerifyContent string `json:"verifyContent"`
 }
 
+type RobotGetLoginsReq struct {
+	RobotType int `json:"robotType"`
+}
+
 type StartWxRsp struct {
 	UUID       string `json:"uuid"`
 	QrcodeUrl  string `json:"qrcodeUrl"`

@@ -159,3 +159,17 @@ func (self *WxHttpSrv) AllRobots(rsp http.ResponseWriter, req *http.Request) (in
 
 	return response, nil
 }
+
+func (self *WxHttpSrv) LoginRobotsFromType(rsp http.ResponseWriter, req *http.Request) (interface{}, error) {
+	request := &RobotGetLoginsReq{}
+	if err := json.NewDecoder(req.Body).Decode(request); err != nil {
+		logrus.Errorf("LoginRobotsFromType json decode error: %v", err)
+		return nil, err
+	}
+	
+	response := WxResponse{Code: WX_RESPONSE_OK}
+	
+	response.Data = self.l.GetRobotsFromType(request.RobotType)
+	
+	return response, nil
+}
