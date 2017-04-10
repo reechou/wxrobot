@@ -13,8 +13,8 @@ type Robot struct {
 	RobotType     int    `xorm:"not null default 0 int index"` // 0: just robot 1: robot group manager 2: robot wechat business
 	IfSaveFriend  int64  `xorm:"not null default 0 int"`
 	IfSaveGroup   int64  `xorm:"not null default 0 int"`
-	Ip            string `xorm:"not null default '' varchar(64) unique(robot_host)"`
-	OfPort        string `xorm:"not null default '' varchar(64) unique(robot_host)"`
+	Ip            string `xorm:"not null default '' varchar(64)"`
+	OfPort        string `xorm:"not null default '' varchar(64)"`
 	LastLoginTime int64  `xorm:"not null default 0 int"`
 	Argv          string `xorm:"not null default '' varchar(2048)"`
 	BaseLoginInfo string `xorm:"not null default '' varchar(2048)"`
