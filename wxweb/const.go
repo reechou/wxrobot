@@ -11,6 +11,8 @@ const (
 	MSG_TYPE_VOICE       = 34
 	MSG_TYPE_CARD        = 42
 	MSG_TYPE_SHARE_URL   = 49
+	
+	MSG_TYPE_TRANSFER    = 2000
 )
 
 const (
@@ -44,12 +46,14 @@ const (
 )
 
 const (
-	RECEIVE_MSG_TYPE_TEXT  = "text"
-	RECEIVE_MSG_TYPE_IMG   = "img"
-	RECEIVE_MSG_TYPE_VOICE = "voice"
-	RECEIVE_MSG_TYPE_VIDEO = "video"
-	RECEIVE_MSG_TYPE_CARD  = "card"
-	RECEIVE_MSG_TYPE_SHARE = "shareurl"
+	RECEIVE_MSG_TYPE_TEXT       = "text"
+	RECEIVE_MSG_TYPE_IMG        = "img"
+	RECEIVE_MSG_TYPE_VOICE      = "voice"
+	RECEIVE_MSG_TYPE_VIDEO      = "video"
+	RECEIVE_MSG_TYPE_CARD       = "card"
+	RECEIVE_MSG_TYPE_SHARE      = "shareurl"
+	RECEIVE_MSG_TYPE_TRANSFER   = "transfer"   // 转账
+	RECEIVE_MSG_TYPE_RED_PACKET = "red-packet" // 红包
 )
 
 type msgUrlHandle func(string) string
@@ -62,6 +66,7 @@ var (
 		MSG_TYPE_VIDEO:     RECEIVE_MSG_TYPE_VIDEO,
 		MSG_TYPE_CARD:      RECEIVE_MSG_TYPE_CARD,
 		MSG_TYPE_SHARE_URL: RECEIVE_MSG_TYPE_SHARE,
+		MSG_TYPE_TRANSFER:  RECEIVE_MSG_TYPE_TRANSFER,
 	}
 	RECEIVE_MSG_CONTENT_MAP = map[int]string{
 		MSG_TYPE_IMG:       "收到一张图片,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
@@ -69,6 +74,7 @@ var (
 		MSG_TYPE_VIDEO:     "收到一段视频,URL为临时地址,当前登录状态下有效(访问需带上cookie)",
 		MSG_TYPE_CARD:      "收到分享名片",
 		MSG_TYPE_SHARE_URL: "收到分享链接",
+		MSG_TYPE_TRANSFER:  "收到转账消息，请在手机上查看",
 	}
 )
 
@@ -78,11 +84,12 @@ const (
 )
 
 const (
-	MSG_MEDIA_KEYWORD       = "CDATA"
-	CLEAR_WX_PREFIX_DEFAULT = "A已被删除"
-	WX_SYSTEM_NOT_FRIEND    = "开启了朋友验证"
-	WX_SYSTEM_MSG_INVITE    = "邀请"
-	WX_SYSTEM_MSG_SCAN      = "扫描"
+	MSG_MEDIA_KEYWORD        = "CDATA"
+	CLEAR_WX_PREFIX_DEFAULT  = "A已被删除"
+	WX_SYSTEM_NOT_FRIEND     = "开启了朋友验证"
+	WX_SYSTEM_MSG_INVITE     = "邀请"
+	WX_SYSTEM_MSG_SCAN       = "扫描"
+	WX_SYSTEM_MSG_RED_PACKET = "红包"
 )
 
 const (

@@ -183,6 +183,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 		if msg == nil {
 			continue
 		}
+		//logrus.Debugf("msg: %v", msg)
 		msgType := msg["MsgType"].(int)
 		fromUserName := msg["FromUserName"].(string)
 		content := msg["Content"].(string)
@@ -205,9 +206,15 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			msgType == MSG_TYPE_VIDEO ||
 			msgType == MSG_TYPE_CARD ||
 			msgType == MSG_TYPE_SHARE_URL {
-			//logrus.Debugf("text msg: %s", content)
+			// check share url app msg type
+			if msgType == MSG_TYPE_SHARE_URL {
+				appMsgType := msg["AppMsgType"].(int)
+				if appMsgType == MSG_TYPE_TRANSFER {
+					msgType = MSG_TYPE_TRANSFER
+				}
+			}
 			receiveMsg.MsgType = RECEIVE_MSG_MAP[msgType]
-			if strings.Contains(content, MSG_MEDIA_KEYWORD) {
+			if msgType != MSG_TYPE_TRANSFER && strings.Contains(content, MSG_MEDIA_KEYWORD) {
 				continue
 			}
 			if strings.HasPrefix(fromUserName, GROUP_PREFIX) {
@@ -267,11 +274,12 @@ func (self *WxWeb) handleMsg(r interface{}) {
 			switch msgType {
 			case MSG_TYPE_TEXT:
 				receiveMsg.Msg = content
-			case MSG_TYPE_CARD, MSG_TYPE_SHARE_URL:
+			case MSG_TYPE_CARD, MSG_TYPE_SHARE_URL, MSG_TYPE_TRANSFER:
 				receiveMsg.Msg = RECEIVE_MSG_CONTENT_MAP[msgType]
 			case MSG_TYPE_IMG, MSG_TYPE_VIDEO, MSG_TYPE_VOICE:
 				receiveMsg.Msg = RECEIVE_MSG_CONTENT_MAP[msgType]
 				receiveMsg.MediaTempUrl = self.msgUrlMap[msgType](msgid)
+				//self.WebwxsendmsgTransfer(self.TestUserName, content, msgType)
 			default:
 				receiveMsg.Msg = "unknown msg"
 			}
@@ -307,9 +315,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 				receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MOD_GROUP_ADD
 				receiveMsg.BaseInfo.FromType = FROM_TYPE_GROUP
 				receiveMsg.GroupMemberNum = group.GetGroupMemberLen()
-				if receiveMsg.BaseInfo.ReceiveEvent != "" {
-					self.wxh.ReceiveMsg(receiveMsg)
-				}
+				self.wxh.ReceiveMsg(receiveMsg)
 			}
 
 			// 系统消息不是好友
@@ -326,6 +332,33 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					}
 					self.WebwxOplog(fromUserName, fmt.Sprintf("%s %s", prefix, userNick))
 				}
+			}
+			
+			if strings.Contains(content, WX_SYSTEM_MSG_RED_PACKET) {
+				receiveMsg := &ReceiveMsgInfo{}
+				receiveMsg.BaseInfo.Uin = self.Session.Uin
+				receiveMsg.BaseInfo.UserName = self.Session.MyUserName
+				receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
+				receiveMsg.BaseInfo.FromUserName = fromUserName
+				receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_MSG
+				receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
+				if receiveMsg.BaseInfo.FromUserName == self.Session.MyUserName {
+					receiveMsg.BaseInfo.FromNickName = self.Session.MyNickName
+					toUserName := msg["ToUserName"].(string)
+					receiveMsg.BaseToUserInfo.ToUserName = toUserName
+					uf, ok := self.Contact.Friends[toUserName]
+					if ok {
+						receiveMsg.BaseToUserInfo.ToNickName = uf.RemarkName
+					}
+				} else {
+					uf, ok := self.Contact.Friends[receiveMsg.BaseInfo.FromUserName]
+					if ok {
+						receiveMsg.BaseInfo.FromNickName = uf.RemarkName
+					}
+				}
+				receiveMsg.MsgType = RECEIVE_MSG_TYPE_RED_PACKET
+				receiveMsg.Msg = content
+				self.wxh.ReceiveMsg(receiveMsg)
 			}
 		} else if msgType == MSG_TYPE_VERIFY_USER {
 			recommendInfo := msg["RecommendInfo"]

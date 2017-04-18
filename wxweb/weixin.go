@@ -1266,32 +1266,45 @@ func (self *WxWeb) Webwxsendmsg(message string, toUserName string) bool {
 	return false
 }
 
-func (self *WxWeb) WebwxsendmsgOfShare(message string, toUserName string) bool {
-	urlstr := fmt.Sprintf("%s/webwxsendmsg?pass_ticket=%s", self.Session.BaseUri, self.Session.PassTicket)
+// 转发消息
+func (self *WxWeb) WebwxsendmsgTransfer(toUserName, content string, msgType int) bool {
+	content = strings.Replace(content, "<", "&lt;", -1)
+	content = strings.Replace(content, ">", "&gt;", -1)
+	
+	//content, _ = strconv.Unquote(content)
+	
+	uri := "webwxsendmsg"
+	if msgType == MSG_TYPE_IMG {
+		uri = "webwxsendmsgimg?fun=async&f=json"
+	} else if msgType == MSG_TYPE_VIDEO {
+		uri = "webwxsendvideomsg?fun=async&f=json"
+	}
+	urlstr := fmt.Sprintf("%s/%s?pass_ticket=%s", self.Session.BaseUri, uri, self.Session.PassTicket)
 	clientMsgId := self._unixStr() + "0" + strconv.Itoa(rand.Int())[3:6]
 	params := make(map[string]interface{})
 	params["BaseRequest"] = self.Session.BaseRequest
 	msg := make(map[string]interface{})
-	msg["Type"] = 7
-	msg["Title"] = message
-	msg["Desc"] = "百度一下"
-	msg["Url"] = "http://www.baidu.com"
-	msg["From"] = "http://www.baidu.com"
+	msg["Type"] = msgType
+	msg["Content"] = content
 	msg["FromUserName"] = self.Session.User["UserName"]
 	msg["ToUserName"] = toUserName
 	msg["LocalID"] = clientMsgId
 	msg["ClientMsgId"] = clientMsgId
+	if msgType == MSG_TYPE_IMG || msgType == MSG_TYPE_VIDEO {
+		msg["MediaId"] = ""
+	}
 	params["Msg"] = msg
+	params["Scene"] = 2
 	data, err := self._post(urlstr, params, true)
 	if err != nil {
-		logrus.Errorf("wx send share msg[%s] toUserName[%s] error: %s", message, toUserName, err)
+		logrus.Errorf("wx send msg[%s] toUserName[%s] error: %s", content, toUserName, err)
 		return false
 	} else {
 		if CheckWebwxRetcode(data) {
-			logrus.Debugf("wx[%s] send share msg[%s] toUserName[%s] success.", self.Session.MyNickName, message, toUserName)
+			logrus.Debugf("wx[%s] send transfer msg[%s-%d] toUserName[%s] success.", self.Session.MyNickName, content, msgType, toUserName)
 			return true
 		}
-		logrus.Errorf("wx[%s] send share msg[%s] error.", self.Session.MyNickName, message)
+		logrus.Errorf("wx[%s] [%s] send transfer msg[%v] error.", self.Session.MyNickName, urlstr, params)
 	}
 	return false
 }
