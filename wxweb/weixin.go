@@ -1016,8 +1016,20 @@ func (self *WxWeb) Webwxverifyuser(opcode int, verifyContent, ticket, userName, 
 			if !ok {
 				logrus.Errorf("nick[%s] webwxoplog realname[%s] error", nickName, realNickName)
 			} else {
-				logrus.Debugf("webwxgetcontact webwxoplog success.")
+				logrus.Debugf("Webwxverifyuser webwxoplog success.")
 				realName = realNickName
+			}
+			uf := self.Contact.GetFriend(userName)
+			if uf != nil {
+				uf.RemarkName = realName
+			} else {
+				uf = &UserFriend{
+					NickName:   nickName,
+					RemarkName: realName,
+					UserName:   userName,
+				}
+				self.Contact.Friends[userName] = uf
+				self.Contact.NickFriends[realName] = uf
 			}
 			return realName, true
 		}
