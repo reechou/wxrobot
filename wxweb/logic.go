@@ -107,7 +107,7 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					//}
 				} else {
 					// 新好友
-					//logrus.Debugf("new friend: %v", modContact)
+					logrus.Debugf("new friend: %v", modContact)
 					userContactFlag := modContact["ContactFlag"].(int)
 					userVerifyFlag := modContact["VerifyFlag"].(int)
 					userNickName := modContact["NickName"].(string)
