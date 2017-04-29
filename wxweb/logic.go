@@ -117,8 +117,8 @@ func (self *WxWeb) handleMsg(r interface{}) {
 					alias := modContact["Alias"].(string)
 					city := modContact["City"].(string)
 					sex := modContact["Sex"].(int)
-					user := self.Contact.Friends[userName]
-					if user == nil {
+					//user := self.Contact.Friends[userName]
+					//if user == nil {
 						//realName := userNickName
 						//_, ok := self.Contact.NickFriends[realName]
 						//if ok {
@@ -126,45 +126,45 @@ func (self *WxWeb) handleMsg(r interface{}) {
 						//	self.WebwxOplog(userName, realName)
 						//}
 
-						realName := userNickName
-						realNickName := fmt.Sprintf("%s__%s", userNickName, time.Now().Format("20060102_15:04"))
-						ok := self.WebwxOplog(userName, realNickName)
-						if !ok {
-							logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
-						} else {
-							logrus.Debugf("mod contact webwxoplog success.")
-							realName = realNickName
-						}
-
-						uf := &UserFriend{
-							Alias:       alias,
-							City:        city,
-							VerifyFlag:  userVerifyFlag,
-							ContactFlag: userContactFlag,
-							NickName:    userNickName,
-							RemarkName:  realName,
-							Sex:         sex,
-							UserName:    userName,
-						}
-						self.Contact.Friends[userName] = uf
-						self.Contact.NickFriends[realName] = uf
-
-						receiveMsg := &ReceiveMsgInfo{}
-						receiveMsg.BaseInfo.Uin = self.Session.Uin
-						receiveMsg.BaseInfo.UserName = self.Session.MyUserName
-						receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
-						receiveMsg.BaseInfo.FromNickName = realName
-						receiveMsg.BaseInfo.FromUserName = userName
-						receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD
-						receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
-						receiveMsg.AddFriend.UserWechat = uf.Alias
-						receiveMsg.AddFriend.UserNick = realName
-						receiveMsg.AddFriend.UserCity = uf.City
-						receiveMsg.AddFriend.UserSex = uf.Sex
-						if receiveMsg.BaseInfo.ReceiveEvent != "" {
-							self.wxh.ReceiveMsg(receiveMsg)
-						}
+					realName := userNickName
+					realNickName := fmt.Sprintf("%s__%s", userNickName, time.Now().Format("20060102_15:04"))
+					ok := self.WebwxOplog(userName, realNickName)
+					if !ok {
+						logrus.Errorf("nick[%s] webwxoplog realname[%s] error", userNickName, realNickName)
+					} else {
+						logrus.Debugf("mod contact webwxoplog success.")
+						realName = realNickName
 					}
+
+					uf := &UserFriend{
+						Alias:       alias,
+						City:        city,
+						VerifyFlag:  userVerifyFlag,
+						ContactFlag: userContactFlag,
+						NickName:    userNickName,
+						RemarkName:  realName,
+						Sex:         sex,
+						UserName:    userName,
+					}
+					self.Contact.Friends[userName] = uf
+					self.Contact.NickFriends[realName] = uf
+
+					receiveMsg := &ReceiveMsgInfo{}
+					receiveMsg.BaseInfo.Uin = self.Session.Uin
+					receiveMsg.BaseInfo.UserName = self.Session.MyUserName
+					receiveMsg.BaseInfo.WechatNick = self.Session.MyNickName
+					receiveMsg.BaseInfo.FromNickName = realName
+					receiveMsg.BaseInfo.FromUserName = userName
+					receiveMsg.BaseInfo.ReceiveEvent = RECEIVE_EVENT_ADD
+					receiveMsg.BaseInfo.FromType = FROM_TYPE_PEOPLE
+					receiveMsg.AddFriend.UserWechat = uf.Alias
+					receiveMsg.AddFriend.UserNick = realName
+					receiveMsg.AddFriend.UserCity = uf.City
+					receiveMsg.AddFriend.UserSex = uf.Sex
+					if receiveMsg.BaseInfo.ReceiveEvent != "" {
+						self.wxh.ReceiveMsg(receiveMsg)
+					}
+					//}
 				}
 			}
 		}
