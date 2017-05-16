@@ -37,6 +37,8 @@ type UserFriend struct {
 	RemarkName  string `json:"remarkName"`
 	Sex         int    `json:"sex"`
 	UserName    string `json:"userName"`
+	
+	IfCheck bool `json:"ifCheck"`
 }
 
 type GroupUserInfo struct {
